@@ -1,0 +1,50 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<script type="text/javascript" src="http://api.maps.yahoo.com/ajaxymap?v=3.7&appid=APP-ID">
+</script>
+<link rel="stylesheet" type="text/css" href="style.css"/>
+<script type="text/javascript" src="script.js"></script>
+</head>
+<body onload="setup();">
+
+<div class="banner">
+  <h1>Oh, The Places You Will Go</h1>
+</div>
+
+<div class="search">
+  <input type="text" name="place" id="place" />
+  <input type="button" value="Find" onclick="findPlace();" />
+</div>
+
+<div id="mapExt">
+  <div id="map"></div>
+</div>
+
+<div class="actionpanel">
+  <input class="actionbutton" type="button" value="What Will I See?" onclick="clearTourPhotos();getTourPhotos();"/>
+  <input class="actionbutton" type="button" value="Start Over" onclick="clearTour();"/>
+</div>
+
+<div id="lightslide">
+  <div id="prevPhotos">
+    <div class="slideButton" onclick="prevPoint();">&larr;</div>
+  </div>
+
+  <div id="photos"></div>
+
+  <div id="nextPhotos">
+    <div class="slideButton" onclick="nextPoint();">&rarr;</div>
+  </div>
+  <div id="waiting"><div><img src="progress.gif"/></div></div>
+</div>
+
+<div id="pager">
+  <span id="pagerNow">0</span> / <span id="pagerTotal">0</span>
+</div>
+
+<div id="debug">
+</div>
+
+</body>
+</html>

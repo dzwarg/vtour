@@ -1,0 +1,272 @@
+<html>
+<head>
+  <script src="OpenLayers/OpenLayers.js"></script>
+  <script type="text/javascript">
+		var basehref = "http://localhost/~davidz/users"
+		function makerequest( method, pathinfo, parameters, data, reqHeaders ) {
+				var obj = null;
+
+				var options = {
+					method:method,
+					asynchronous:false,
+					onComplete:function( resp ) { obj = resp },
+					parameters:parameters,
+					postBody:data,
+					requestHeaders:reqHeaders
+				}
+
+				var req = new OpenLayers.Ajax.Request( basehref + pathinfo, options )
+
+				var evaltxt = "var tc=" + obj.responseText
+
+				eval( evaltxt )
+
+				return tc
+		}
+
+		function test_01_users(t) {
+				t.plan(3)
+
+				var tc = makerequest( "get", "", "" )
+
+				t.ok( tc != null, "got a json object back" )
+				
+				t.ok( tc.message != null, "response json message is not null" )
+				t.ok( tc.message == "Nothing to do. No path info.", "message is good" )
+		}
+    
+    function test_02_users_login(t) {
+        t.plan(3)
+        
+        var tc = makerequest( "get", "/login", "", "" )
+
+        t.ok( tc != null, "got a json object back")
+        t.ok( tc.message != null, "response json message is not null" )
+        t.ok( tc.message == "No user or password specified.", "message is good" )
+    }
+    
+    function test_03_users_login_nopass(t) {
+        t.plan(3)
+        
+        var tc = makerequest( "get", "/login", "user=testuser", "" )
+
+        t.ok( tc != null, "got a json object back")
+        t.ok( tc.message != null, "response json message is not null" )
+        t.ok( tc.message == "No user or password specified.", "message is good" )
+    }
+ 
+		function test_04_users_delete_full(t) {
+				t.plan(3)
+
+				var tc = makerequest( "get", "/login", "user=testuser&password=secret", "" )
+
+				var id = tc.user.id
+				var secret = tc.secret
+
+				var tc = makerequest( "delete", "/" + id, "", "", [ "vtauth", secret ] )
+
+				t.ok( tc != null, "got a json object back" )
+				t.ok( tc.message != null, "response json message is not null" )
+				t.ok( tc.message == "ok", "message is good" )
+		}
+
+		function test_05_users_delete_invalid(t) {
+				t.plan(3)
+
+				var tc = makerequest( "get", "/login", "user=testuser&password=secret", "" )
+
+				var id = tc.user.id
+
+				var tc = makerequest( "delete", "/" + id, "", "", [ "vtauth", "garbage" ] )
+
+				t.ok( tc != null, "got a json object back" )
+				t.ok( tc.message != null, "response json message is not null" )
+				t.ok( tc.message == "User secret is invalid.", "message is good" )
+		}
+
+		function test_06_users_delete(t) {
+				t.plan(3)
+
+				var tc = makerequest( "get", "/login", "user=testuser&password=secret", "" )
+
+				var id = tc.user.id
+
+				var tc = makerequest( "delete", "/" + id, "", "" )
+
+				t.ok( tc != null, "got a json object back" )
+				t.ok( tc.message != null, "response json message is not null" )
+				t.ok( tc.message == "User secret is invalid.", "message is good" )
+		}
+
+		function test_07_users_post(t) {
+				t.plan(3)
+
+				var tc = makerequest( "get", "/login", "user=testuser&password=secret", "" )
+
+				var id = tc.user.id
+
+				tc = makerequest( "post", "/" + id, "", "" )
+
+				t.ok( tc != null, "got a json object back" )
+				t.ok( tc.message != null, "response json message is not null" )
+				t.ok( /Incomplete user data.*/.test( tc.message ), "message is good" )
+		}
+       
+		function test_08_users_post(t) {
+				t.plan(3)
+
+				var tc = makerequest( "get", "/login", "user=testuser&password=secret", "" )
+
+				var id = tc.user.id
+
+				tc = makerequest( "post", "/" + id, "", "user=testuser" )
+
+				t.ok( tc != null, "got a json object back" )
+				t.ok( tc.message != null, "response json message is not null" )
+				t.ok( /Incomplete user data.*/.test( tc.message ), "message is good" )
+		}
+
+		function test_09_users_post(t) {
+				t.plan(3)
+
+				var tc = makerequest( "get", "/login", "user=testuser&password=secret", "" )
+
+				var id = tc.user.id
+
+				tc = makerequest( "post", "/" + id, "", "user=testuser&password=secret" )
+
+				t.ok( tc != null, "got a json object back" )
+				t.ok( tc.message != null, "response json message is not null" )
+				t.ok( /Incomplete user data.*/.test( tc.message ), "message is good" )
+		}
+
+		function test_10_users_post(t) {
+				t.plan(3)
+
+				var tc = makerequest( "get", "/login", "user=testuser&password=secret", "" )
+
+				var id = tc.user.id
+
+				tc = makerequest( "post", "/" + id, "", "user=testuser&password=secret&email=davidz-tset@spondubone.net" )
+
+				t.ok( tc != null, "got a json object back" )
+				t.ok( tc.message != null, "response json message is not null" )
+				t.ok( /Incomplete user data.*/.test( tc.message ), "message is good" )
+		}
+
+		function test_11_users_post_badsecret(t) {
+				t.plan(3)
+
+				var tc = makerequest( "get", "/login", "user=testuser&password=secret", "" )
+
+				var id = tc.user.id
+
+				tc = makerequest( "post", "/" + id, "", "user=testuser&password=secret&email=davidz-tset@spondubone.net", [ "Content-type","application/x-www-form-urlencoded", "vtauth", "garbage" ]  )
+
+				t.ok( tc != null, "got a json object back" )
+				t.ok( tc.message != null, "response json message is not null" )
+				t.ok( tc.message == "Update secrets don't match.", "message is good" )
+		}
+
+		function test_12_users_post_full(t) {
+				t.plan(3)
+
+				var tc = makerequest( "get", "/login", "user=testuser&password=secret", "" )
+
+				var id = tc.user.id
+				var secret = tc.secret
+
+				tc = makerequest( "post", "/" + id, "", "user=testuser&password=secret&email=davidz-tset@spondubone.net", [ "Content-type","application/x-www-form-urlencoded", "vtauth", secret ] )
+
+				t.ok( tc != null, "got a json object back" )
+				t.ok( tc.message != null, "response json message is not null" )
+				t.ok( tc.message == "ok", "message is good" )
+		}
+
+    function test_13_users_login_full(t) {
+        t.plan(4)
+        
+        var tc = makerequest( "get", "/login", "user=testuser&password=secret", "" )
+
+        t.ok( tc != null, "got a json object back")
+        t.ok( tc.message != null, "response json message is not null" )
+        t.ok( tc.message == "ok", "message is good" )
+				t.ok( /\/users\/\d+$/.test( tc.user.uri ), "link is good" )
+    }
+
+    function test_14_users_login_invalid(t) {
+        t.plan(3)
+        
+        var tc = makerequest( "get", "/login", "user=testuser&password=compromised", "" )
+
+        t.ok( tc != null, "got a json object back")
+        t.ok( tc.message != null, "response json message is not null" )
+        t.ok( tc.message == "Invalid login", "message is good" )
+    }
+
+		function test_15_users_post(t) {
+				t.plan(3)
+
+				var tc = makerequest( "post", "/register", "", "" )
+
+				t.ok( tc != null, "got a json object back" )
+				t.ok( tc.message != null, "response json message is not null" )
+				t.ok( /Incomplete user data.*/.test( tc.message ), "message is good" )
+		}
+
+		function test_16_users_post_nopass(t) {
+				t.plan(3)
+
+				var tc = makerequest( "post", "/register", "", "user=testuser" )
+
+				t.ok( tc != null, "got a json object back" )
+				t.ok( tc.message != null, "response json message is not null" )
+				t.ok( /Incomplete user data.*/.test( tc.message ), "message is good" )
+		}
+
+		function test_17_users_post_noemail(t) {
+				t.plan(3)
+
+				var tc = makerequest( "post", "/register", "", "user=testuser&password=secret" )
+
+				t.ok( tc != null, "got a json object back" )
+				t.ok( tc.message != null, "response json message is not null" )
+				t.ok( /Incomplete user data.*/.test( tc.message ), "message is good" )
+		}
+
+		function test_18_users_post_wrongverb(t) {
+				t.plan(3)
+
+				var tc = makerequest( "get", "/register", "user=testuser&password=secret&email=davidz-test@spondubone.net" )
+
+				t.ok( tc != null, "got a json object back" )
+				t.ok( tc.message != null, "response json message is not null" )
+				t.ok( tc.message == "Nothing to do.", "message is good" )
+		}
+
+		function test_19_users_post_duplicate(t) {
+				t.plan(3)
+
+				var tc = makerequest( "post", "/register", "", "user=testuser&password=secret&email=davidz-test@spondubone.net", [ "Content-type","application/x-www-form-urlencoded" ] )
+
+				t.ok( tc != null, "got a json object back" )
+				t.ok( tc.message != null, "response json message is not null" )
+				t.ok( tc.message == "A user with that name already exists.", "message is good" )
+		}
+
+		function test_20_users_post_complete(t) {
+				t.plan(4)
+
+				var tc = makerequest( "post", "/register", "", "user=testuser&password=secret&email=davidz-test@spondubone.net", [ "Content-type","application/x-www-form-urlencoded" ] )
+
+				t.ok( tc != null, "got a json object back" )
+				t.ok( tc.message != null, "response json message is not null" )
+				t.ok( tc.message == "ok", "message is good" )
+				t.ok( /\/users\/\d+$/.test( tc.user.uri ), "link is good" )
+		}
+
+  </script>
+</head>
+<body>
+</body>
+</html>

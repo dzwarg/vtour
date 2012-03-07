@@ -1,0 +1,235 @@
+<html>
+<head>
+  <script src="OpenLayers/OpenLayers.js"></script>
+  <script type="text/javascript">
+		var basehref = "http://localhost/~davidz/users"
+		function makerequest( method, pathinfo, parameters, data, reqHeaders ) {
+				var obj = null;
+
+				var options = {
+					method:method,
+					asynchronous:false,
+					onComplete:function( resp ) { obj = resp },
+					parameters:parameters,
+					postBody:data,
+					requestHeaders:reqHeaders
+				}
+
+				var req = new OpenLayers.Ajax.Request( basehref + pathinfo, options )
+
+				var tc = null;
+
+				eval( "tc=" + obj.responseText )
+
+				return tc
+		}
+
+		function addtestuser(t) {
+				var tc = makerequest( "post", "/register", "", "user=testuser&password=secret&email=davidz-test@spondubone.net", [ "Content-type","application/x-www-form-urlencoded" ] )
+
+				return tc
+		}
+
+		function deletetestuser(tc) {
+				var id = tc.user.id
+				var secret = tc.secret
+
+				var tc = makerequest( "delete", "/" + id, "", "", [ "vtauth", secret ] )
+				return tc
+		}
+
+		function addsetting( usr, name ) {
+				var id = usr.user.id
+				var secret = usr.secret
+				var tc = makerequest( "post", "/" + id + "/setting/" + name, "", "value=whatwhat", [ "Content-type","application/x-www-form-urlencoded", "vtauth", secret ] )
+				return tc
+		}
+
+		function deletesetting( usr, name ) {
+				var id = usr.user.id
+				var secret = usr.secret
+
+				var tc = makerequest( "delete", "/" + id + "/setting/" + name, "", "", [ "vtauth", secret ] )
+				return tc
+		}
+/*
+
+		function test_01_setting_add(t) {
+				t.plan( 6 )
+
+				var usr = addtestuser(t)
+				t.ok( usr.user.id > 0, "good user id" )
+
+				var sng = addsetting( usr, "test_setting" )
+				t.ok( sng.message == "ok", "message ok" )
+				t.ok( typeof(sng.setting) != "undefined", "settings are defined" )
+				t.ok( sng.setting.name == "test_setting", "setting name is correct" )
+
+				var del = deletesetting( usr, "test_setting" )
+				t.ok( del.message == "ok", "deleted test setting" )
+
+				del = deletetestuser( usr );
+				t.ok( del.message == "ok", "deleted test user" )
+		}
+
+		function test_02_setting(t) {
+				t.plan(3)
+
+				// setup
+				var usr = addtestuser(t)
+				// end setup
+
+				var tc = makerequest( "get", "/" + usr.user.id + "/setting", "", "" )
+
+				t.ok( tc != null, "got a json object back" )
+				
+				t.ok( tc.message != null, "response json message is not null" )
+				t.ok( tc.message == "Not enough path to go on.", "message is good" )
+
+				// teardown
+				deletetestuser( usr )
+				// end teardown
+		}
+
+    function test_03_setting_none_noauth(t) {
+        t.plan(3)
+        
+				// setup
+				var usr = addtestuser(t)
+				// end setup
+
+        tc = makerequest( "get", "/" + usr.user.id + "/setting/bogusname", "", "" )
+
+        t.ok( tc != null, "got a json object back")
+        t.ok( tc.message != null, "response json message is not null" )
+        t.ok( /is not a valid user, or the authorization is incorrect/.test( tc.message ), "message is good" )
+
+				// teardown
+				deletetestuser( usr )
+				// end teardown
+    }
+
+    function test_04_setting_none_invalid(t) {
+        t.plan(3)
+        
+				// setup
+				var usr = addtestuser(t)
+				// end setup
+
+        tc = makerequest( "get", "/" + usr.user.id + "/setting/bogusname", "", "", [ "vtauth", "garbage" ] )
+
+        t.ok( tc != null, "got a json object back")
+        t.ok( tc.message != null, "response json message is not null" )
+        t.ok( /is not a valid user, or the authorization is incorrect/.test(tc.message), "message is good" )
+
+				// teardown
+				deletetestuser( usr )
+				// end teardown
+    }
+ 
+		function test_05_setting_full(t) {
+				t.plan(5)
+
+				// setup
+				var usr = addtestuser(t)
+				var sng = addsetting( usr, "test_setting" )
+				// end setup
+
+				var tc = makerequest( "get", "/" + usr.user.id + "/setting/test_setting" , "", "", [ "vtauth", usr.secret ] )
+
+				t.ok( tc != null, "got a json object back" )
+				t.ok( tc.message != null, "response json message is not null" )
+				t.ok( tc.message == "ok", "message is good" )
+				t.ok( tc.setting != null, "setting is not null" )
+				t.ok( tc.setting.value == "whatwhat", "setting value is correct" )
+
+				// teardown
+			  deletesetting( usr, "test_setting" )
+				deletetestuser( usr )
+				// end teardown
+		}
+
+		function test_06_setting_update(t) {
+				t.plan(6)
+
+				// setup
+				var usr = addtestuser(t)
+				var sng = addsetting( usr, "test_setting" )
+				// end setup
+
+				var tc = makerequest( "get", "/" + usr.user.id + "/setting/test_setting", "", "", [ "vtauth", usr.secret ] )
+
+				t.ok( tc != null, "got a json object back" )
+				t.ok( tc.message != null, "response json message is not null" )
+				t.ok( tc.message == "ok", "message is good" )
+
+				tc = makerequest( "post", "/" + usr.user.id + "/setting/test_setting", "", "value=whywhy", [ "Content-type","application/x-www-form-urlencoded", "vtauth", usr.secret ] )
+				
+				t.ok( tc != null, "got a json object back" )
+				t.ok( tc.message != null, "response json message is not null" )
+				t.ok( tc.message == "ok", "message is good" )
+
+				// teardown
+			  deletesetting( usr, "test_setting" )
+				deletetestuser( usr )
+				// end teardown
+		}
+
+		function test_07_setting_no_value(t) {
+				t.plan(6)
+
+				// setup
+				var usr = addtestuser(t)
+				var sng = addsetting( usr, "test_setting" )
+				// end setup
+
+				var tc = makerequest( "get", "/" + usr.user.id + "/setting/test_setting", "", "", [ "vtauth", usr.secret ] )
+
+				t.ok( tc != null, "got a json object back" )
+				t.ok( tc.message != null, "response json message is not null" )
+				t.ok( tc.message == "ok", "message is good" )
+
+				tc = makerequest( "post", "/" + usr.user.id + "/setting/test_setting", "", "", [ "vtauth", usr.secret ] )
+				
+				t.ok( tc != null, "got a json object back" )
+				t.ok( tc.message != null, "response json message is not null" )
+				t.ok( tc.message == "'value' not found, and required for creating or editing a setting.", "message is good" )
+
+				// teardown
+			  deletesetting( usr, "test_setting" )
+				deletetestuser( usr )
+				// end teardown
+		}
+*/
+
+		function test_08_setting_empty_value(t) {
+				t.plan(6)
+
+				// setup
+				var usr = addtestuser(t)
+				var sng = addsetting( usr, "test_setting" )
+				// end setup
+
+				var tc = makerequest( "get", "/" + usr.user.id + "/setting/test_setting", "", "", [ "vtauth", usr.secret ] )
+
+				t.ok( tc != null, "got a json object back" )
+				t.ok( tc.message != null, "response json message is not null" )
+				t.ok( tc.message == "ok", "message is good" )
+
+				tc = makerequest( "post", "/" + usr.user.id + "/setting/test_setting", "", "value=+", [ "Content-type","application/x-www-form-urlencoded", "vtauth", usr.secret ] )
+				
+				t.ok( tc != null, "got a json object back" )
+				t.ok( tc.message != null, "response json message is not null" )
+				t.ok( tc.message == "ok", "message is good" )
+
+				// teardown
+			  deletesetting( usr, "test_setting" )
+				deletetestuser( usr )
+				// end teardown
+		}
+  </script>
+</head>
+<body>
+</body>
+</html>
+

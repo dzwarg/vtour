@@ -1,0 +1,306 @@
+<html>
+<head>
+  <script src="OpenLayers/OpenLayers.js"></script>
+  <script type="text/javascript">
+		var tfshref = "http://localhost/~davidz/featureserver-1.12/featureserver.cgi/tour"
+		var sfshref = "http://localhost/~davidz/featureserver-1.12/featureserver.cgi/search"
+		var basehref = "http://localhost/~davidz/users"
+		function makerequest( method, pathinfo, parameters, data, reqHeaders ) {
+				var obj = null;
+
+				var options = {
+					method:method,
+					asynchronous:false,
+					onComplete:function( resp ) { obj = resp },
+					parameters:parameters,
+					postBody:data,
+					requestHeaders:reqHeaders
+				}
+
+				var req = new OpenLayers.Ajax.Request( basehref + pathinfo, options )
+
+				var tc = null;
+
+				eval( "tc=" + obj.responseText )
+
+				return tc
+		}
+
+		function addtestuser(t) {
+				var tc = makerequest( "post", "/register", "", "user=testuser&password=secret&email=davidz-test@spondubone.net", [ "Content-type","application/x-www-form-urlencoded" ] )
+
+				return tc;
+		}
+
+		function deletetestuser(tc) {
+				var id = tc.user.id
+				var secret = tc.secret
+
+				makerequest( "delete", "/" + id, "", "", [ "vtauth", secret ] )
+		}
+
+		function addtourfeature( user, name ) {
+				var json = '{"type":"FeatureCollection","features":[{"type":"Feature","geometry": {"type": "Line", ' + 
+					'"coordinates": [[-1.0, 1.0], [1.0, -1.0], [1.0, 1.0], [-1.0, -1.0]]}, "properties": {"name": ' + 
+					'"' + name + '", "user_id": ' + user + ', "date": "2000-01-10", "public": false }}],"crs":{"type":"OGC",' +
+				  '"properties":{"urn":"urn:ogc:def:crs:OGC:1.3:CRS84"}}}'
+
+				var rsp = null
+        new OpenLayers.Ajax.Request(tfshref, {
+				  method: 'post', 
+          postBody: json,
+          requestHeaders: ['Accept', 'application/json'],
+					asynchronous: false,
+          onSuccess: function(xhr) {
+						rsp = xhr.responseText
+					},
+          onFailure: function(xhr) {
+            rsp = xhr.status
+          }
+    		});
+
+				var item = null
+				eval( "item = " + rsp )
+
+				return item.features[0].id
+		}
+
+		function addsearchfeature( user, tourid ) {
+				var json = '{"type":"FeatureCollection","features":[{"type":"Feature","geometry": {"type": "Line", ' + 
+					'"coordinates": [[-1.0, 1.0], [1.0, -1.0], [1.0, 1.0], [-1.0, -1.0]]}, "properties": {' + 
+					'"user_id": ' + user + ', "tour": ' + tourid + '}}],"crs":{"type":"OGC",' +
+				  '"properties":{"urn":"urn:ogc:def:crs:OGC:1.3:CRS84"}}}'
+
+				var rsp = null
+        new OpenLayers.Ajax.Request(sfshref, {
+				  method: 'post', 
+          postBody: json,
+          requestHeaders: ['Accept', 'application/json'],
+					asynchronous: false,
+          onSuccess: function(xhr) {
+						rsp = xhr.responseText
+					},
+          onFailure: function(xhr) {
+            rsp = xhr.status
+          }
+    		});
+
+				var item = null
+				eval( "item = " + rsp )
+
+				return item.features[0].id
+		}
+
+		function deletetourfeature( featid ) {
+				var rsp = null
+				new OpenLayers.Ajax.Request(tfshref + "/" + featid, {
+				  method: 'delete', 
+          requestHeaders: ['Accept', 'application/json'],
+					asynchronous: false,
+          onSuccess: function(xhr) {
+						rsp = xhr.responseText
+					},
+          onFailure: function(xhr) {
+            rsp = xhr.status
+          }
+    		})
+
+				var item = null;
+				eval( "item = " + rsp )
+
+				return item.features.length
+		}
+
+		function deletesearchfeature( featid ) {
+				var rsp = null
+				new OpenLayers.Ajax.Request(sfshref + "/" + featid, {
+				  method: 'delete', 
+          requestHeaders: ['Accept', 'application/json'],
+					asynchronous: false,
+          onSuccess: function(xhr) {
+						rsp = xhr.responseText
+					},
+          onFailure: function(xhr) {
+            rsp = xhr.status
+          }
+    		})
+
+				var item = null;
+				eval( "item = " + rsp )
+
+				return item.features.length
+		}
+
+		function test_01_searches_add_via_fs(t) {
+				t.plan( 4 )
+
+				var usr = addtestuser(t)
+
+				var tid = addtourfeature( usr.user.id, "test_name" )
+				t.ok( tid > 0, "good tour id" )
+
+				var sid = addsearchfeature( usr.user.id, tid )
+				t.ok( sid > 0, "good search id" )
+
+				var feats = deletesearchfeature( sid )
+				t.ok( feats == 0, "no more search features" )
+
+				feats = deletetourfeature( tid )
+				t.ok( feats == 0, "no more tour features" )
+
+				deletetestuser( usr )
+
+		}
+
+		function test_02_search(t) {
+				t.plan(3)
+
+				// setup
+				var usr = addtestuser(t)
+				var tid = addtourfeature( usr.user.id, "test_name" )
+				// end setup
+
+				var tc = makerequest( "get", "/" + usr.user.id + "/tour/" + tid + "/search", "", "" )
+
+				t.ok( tc != null, "got a json object back" )
+				
+				t.ok( tc.message != null, "response json message is not null" )
+				t.ok( tc.message == "Not enough path to go on.", "message is good" )
+
+				// teardown
+				deletetourfeature( tid )
+				deletetestuser( usr )
+				// end teardown
+		}
+
+    function test_03_search_all(t) {
+        t.plan(3)
+        
+				// setup
+				var usr = addtestuser(t)
+				var tid = addtourfeature( usr.user.id, "test_name" )
+				// end setup
+
+        tc = makerequest( "get", "/" + usr.user.id + "/tour/" + tid + "/search/all", "", "" )
+
+        t.ok( tc != null, "got a json object back")
+        t.ok( tc.message != null, "response json message is not null" )
+        t.ok( /is not a valid user, or the authorization is incorrect/.test( tc.message ), "message is good" )
+
+				// teardown
+				deletetourfeature( tid )
+				deletetestuser( usr )
+				// end teardown
+    }
+
+    function test_04_search_all_invalid(t) {
+        t.plan(3)
+        
+				// setup
+				var usr = addtestuser(t)
+				var tid = addtourfeature( usr.user.id, "test_name" )
+				// end setup
+
+        tc = makerequest( "get", "/" + usr.user.id + "/tour/" + tid + "/search/all", "", "", [ "vtauth", "garbage" ] )
+
+        t.ok( tc != null, "got a json object back")
+        t.ok( tc.message != null, "response json message is not null" )
+        t.ok( /is not a valid user, or the authorization is incorrect/.test(tc.message), "message is good" )
+
+				// teardown
+				deletetourfeature( tid )
+				deletetestuser( usr )
+				// end teardown
+    }
+ 
+		function test_05_search_all_full(t) {
+				t.plan(4)
+
+				// setup
+				var usr = addtestuser(t)
+				var tid = addtourfeature( usr.user.id, "test_name" )
+				var sid = addsearchfeature( usr.user.id, tid )
+				// end setup
+
+				var tc = makerequest( "get", "/" + usr.user.id + "/tour/" + tid + "/search/all" , "", "", [ "vtauth", usr.secret ] )
+
+				t.ok( tc != null, "got a json object back" )
+				t.ok( tc.message != null, "response json message is not null" )
+				t.ok( tc.message == "ok", "message is good" )
+				t.ok( tc.searches.length == 1, "correct num returned" )
+
+				// teardown
+				deletesearchfeature( sid )
+				deletetourfeature( tid )
+				deletetestuser( usr )
+				// end teardown
+		}
+
+		function test_06_search_id_invalid_secret(t) {
+				t.plan(3)
+
+				// setup
+				var usr = addtestuser(t)
+				var tid = addtourfeature( usr.user.id, "test_name" )
+				// end setup
+
+				var tc = makerequest( "get", "/" + usr.user.id + "/tour/" + tid + "/search/987654321", "", "" )
+
+				t.ok( tc != null, "got a json object back" )
+				t.ok( tc.message != null, "response json message is not null" )
+				t.ok( /is not a valid user, or the authorization is incorrect/.test( tc.message ), "message is good" )
+
+				// teardown
+				deletetourfeature( tid )
+				deletetestuser( usr )
+				// end teardown
+		}
+
+		function test_07_search_id_invalid_id(t) {
+				t.plan(4)
+
+				// setup
+				var usr = addtestuser(t)
+				var tid = addtourfeature( usr.user.id, "test_name" )
+				// end setup
+
+				var tc = makerequest( "get", "/" + usr.user.id + "/tour/" + tid + "/search/987654321", "", "", [ "vtauth", usr.secret ] )
+
+				t.ok( tc != null, "got a json object back" )
+				t.ok( tc.message != null, "response json message is not null" )
+				t.ok( tc.message == "ok", "message is good" )
+				t.ok( typeof(tc.searches) == "undefined", "no search results" )
+
+				// teardown
+				deletetourfeature( tid )
+				deletetestuser( usr )
+				// end teardown
+		}
+
+		function test_08_search_id_full(t) {
+				t.plan( 4 )
+
+				// setup
+			  var usr = addtestuser(t)
+				var tid = addtourfeature( usr.user.id, "test_name" )
+				var sid = addsearchfeature( usr.user.id, tid )
+				// end setup
+
+				var tc = makerequest( "get", "/" + usr.user.id + "/tour/" + tid + "/search/" + sid, "", "", [ "vtauth", usr.secret ] )
+				t.ok( tc != null, "got a json object back" )
+				t.ok( tc.message != null, "response json message is not null" )
+				t.ok( tc.message == "ok", "message is good" )
+				t.ok( tc.searches.length == 1, "correct num returned" )
+
+				// teardown
+				deletesearchfeature( sid )
+				deletetourfeature( tid )
+				deletetestuser( usr )
+				// end teardown
+		}
+  </script>
+</head>
+<body>
+</body>
+</html>
+

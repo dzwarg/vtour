@@ -1,0 +1,290 @@
+<html>
+<head>
+  <script src="OpenLayers/OpenLayers.js"></script>
+  <script type="text/javascript">
+		var fshref = "http://localhost/~davidz/featureserver-1.12/featureserver.cgi/tour"
+		var basehref = "http://localhost/~davidz/users"
+		function makerequest( method, pathinfo, parameters, data, reqHeaders ) {
+				var obj = null;
+
+				var options = {
+					method:method,
+					asynchronous:false,
+					onComplete:function( resp ) { obj = resp },
+					parameters:parameters,
+					postBody:data,
+					requestHeaders:reqHeaders
+				}
+
+				var req = new OpenLayers.Ajax.Request( basehref + pathinfo, options )
+
+				var tc = null;
+
+				eval( "tc=" + obj.responseText )
+
+				return tc
+		}
+
+		function addtestuser(t) {
+				var tc = makerequest( "post", "/register", "", "user=testuser&password=secret&email=davidz-test@spondubone.net", [ "Content-type","application/x-www-form-urlencoded" ] )
+
+				return tc;
+		}
+
+		function deletetestuser(tc) {
+				var id = tc.user.id
+				var secret = tc.secret
+
+				makerequest( "delete", "/" + id, "", "", [ "vtauth", secret ] )
+		}
+
+		function addfeature( user, name ) {
+				var json = '{"type":"FeatureCollection","features":[{"type":"Feature","geometry": {"type": "Line", ' + 
+					'"coordinates": [[-1.0, 1.0], [1.0, -1.0], [1.0, 1.0], [-1.0, -1.0]]}, "properties": {"name": ' + 
+					'"' + name + '", "user_id": ' + user + ', "date": "2000-01-10", "public": false }}],"crs":{"type":"OGC",' +
+				  '"properties":{"urn":"urn:ogc:def:crs:OGC:1.3:CRS84"}}}'
+
+				var rsp = null
+        new OpenLayers.Ajax.Request(fshref, {
+				  method: 'post', 
+          postBody: json,
+          requestHeaders: ['Accept', 'application/json'],
+					asynchronous: false,
+          onSuccess: function(xhr) {
+						rsp = xhr.responseText
+					},
+          onFailure: function(xhr) {
+            rsp = xhr.status
+          }
+    		});
+
+				var item = null
+				eval( "item = " + rsp )
+
+				return item.features[0].id
+		}
+
+		function deletefeature( featid ) {
+				var rsp = null
+				new OpenLayers.Ajax.Request(fshref + "/" + featid, {
+				  method: 'delete', 
+          requestHeaders: ['Accept', 'application/json'],
+					asynchronous: false,
+          onSuccess: function(xhr) {
+						rsp = xhr.responseText
+					},
+          onFailure: function(xhr) {
+            rsp = xhr.status
+          }
+    		})
+
+				var item = null;
+				eval( "item = " + rsp )
+
+				return item.features.length
+		}
+
+		function test_01_tours(t) {
+				t.plan(3)
+
+				// setup
+				var usr = addtestuser(t)
+				// end setup
+
+				var tc = makerequest( "get", "/" + usr.user.id + "/tour", "", "" )
+
+				t.ok( tc != null, "got a json object back" )
+				
+				t.ok( tc.message != null, "response json message is not null" )
+				t.ok( tc.message == "Not enough path to go on.", "message is good" )
+
+				// teardown
+				deletetestuser( usr )
+				// end teardown
+		}
+    function test_02_tours_name_null(t) {
+        t.plan(3)
+        
+				// setup
+				var usr = addtestuser(t)
+				// end setup
+
+        tc = makerequest( "get", "/" + usr.user.id + "/tour/name", "", "" )
+
+        t.ok( tc != null, "got a json object back")
+        t.ok( tc.message != null, "response json message is not null" )
+        t.ok( tc.message == "To get a tour by name, please supply the name.", "message is good" )
+
+				// teardown
+				deletetestuser( usr )
+				// end teardown
+    }
+    
+    function test_03_tours_name_invalid(t) {
+        t.plan(3)
+        
+				// setup
+				var usr = addtestuser(t)
+				// end setup
+
+        tc = makerequest( "get", "/" + usr.user.id + "/tour/name/what", "", "" )
+
+        t.ok( tc != null, "got a json object back")
+        t.ok( tc.message != null, "response json message is not null" )
+        t.ok( /is not a valid user, or authorization is incorrect/.test(tc.message), "message is good" )
+
+				// teardown
+				deletetestuser( usr )
+				// end teardown
+    }
+ 
+		function test_04_tours_name_no_secret(t) {
+				t.plan(3)
+
+				// setup
+				var usr = addtestuser(t)
+				// end setup
+
+				var tc = makerequest( "get", "/" + usr.user.id + "/tour/name/test_name" , "", "" )
+
+				t.ok( tc != null, "got a json object back" )
+				t.ok( tc.message != null, "response json message is not null" )
+				t.ok( /is not a valid user, or authorization is incorrect/.test( tc.message ), "message is good" )
+
+				// teardown
+				deletetestuser( usr )
+				// end teardown
+		}
+
+		function test_05_tours_name_invalid(t) {
+				t.plan(3)
+
+				// setup
+				var usr = addtestuser(t)
+				// end setup
+
+				var tc = makerequest( "get", "/" + usr.user.id + "/tour/name/test_name", "", "", [ "vtauth", "garbage" ] )
+
+				t.ok( tc != null, "got a json object back" )
+				t.ok( tc.message != null, "response json message is not null" )
+				t.ok( /is not a valid user, or authorization is incorrect/.test( tc.message ), "message is good" )
+
+				// teardown
+				deletetestuser( usr )
+				// end teardown
+		}
+
+		function test_06_tours_add_via_fs(t) {
+				t.plan( 2 )
+
+				var usr = addtestuser(t)
+
+				var id = addfeature( usr.user.id, "test_name" )
+
+				t.ok( id > 0, "good id" )
+
+				var feats = deletefeature( id )
+
+				deletetestuser( usr )
+
+				t.ok( feats == 0, "no more features" )
+		}
+
+		function test_07_tour_all_invalid(t) {
+				t.plan( 3 )
+
+				// setup
+			  var usr = addtestuser(t)
+				// end setup
+
+				var tc = makerequest( "get", "/" + usr.user.id + "/tour/all", "", "", [ "vtauth", "garbage" ] )
+				t.ok( tc != null, "got a json object back" )
+				t.ok( tc.message != null, "response json message is not null" )
+				t.ok( /is not a valid user, or the authorization is incorrect/.test(tc.message), "message is good" )
+
+				// teardown
+				deletetestuser( usr )
+				// end teardown
+		}
+
+		function test_08_tour_all(t) {
+				t.plan( 3 )
+
+				// setup
+				var usr = addtestuser(t)
+				var id = addfeature( usr.user.id, "test_name" )
+				// end setup
+
+				var tc = makerequest( "get", "/" + usr.user.id + "/tour/all", "", "", [ "vtauth", usr.secret ] )
+				t.ok( tc != null, "got a json object back" )
+				t.ok( tc.message != null, "response json message is not null" )
+				t.ok( tc.message == "ok", "message is good" )
+
+				// teardown
+				var feats = deletefeature( id )
+				deletetestuser( usr )
+				// end teardown
+		}
+
+		function test_09_tour_id_invalid(t) {
+				t.plan(3)
+
+				// setup
+				var usr = addtestuser(t)
+				var id = addfeature( usr.user.id, "test_name" )
+				// end setup
+
+				var tc = makerequest( "get", "/" + usr.user.id + "/tour/" + id, "", "", [ "vtauth", "garbage" ] )
+				t.ok( tc != null, "got a json object back" )
+				t.ok( tc.message != null, "response json message is not null" )
+				t.ok( /is not a valid user/.test( tc.message ), "message is good" )
+
+				// teardown
+				var feats = deletefeature( id )
+				deletetestuser( usr )
+				// end teardown				
+		}
+
+		function test_10_tour_id(t) {
+				t.plan(3)
+
+				// setup
+				var usr = addtestuser(t)
+				var id = addfeature( usr.user.id, "test_name" )
+				// end setup
+
+				var tc = makerequest( "get", "/" + usr.user.id + "/tour/" + id, "", "", [ "vtauth", usr.secret ] )
+				t.ok( tc != null, "got a json object back" )
+				t.ok( tc.message != null, "response json message is not null" )
+				t.ok( tc.message == "ok", "message is good" )
+
+				// teardown
+				var feats = deletefeature( id )
+				deletetestuser( usr )
+				// end teardown
+		}
+
+		function test_11_tour_get_name(t) {
+				t.plan(3)
+
+				// setup
+				var usr = addtestuser(t)
+				var id = addfeature( usr.user.id, "test_name" )
+				// end setup
+
+				var tc = makerequest( "get", "/" + usr.user.id + "/tour/name/test_name", "", "", [ "vtauth", usr.secret ] )
+				t.ok( tc != null, "got a json object back" )
+				t.ok( tc.message != null, "response json message is not null" )
+				t.ok( tc.message == "ok", "message is good" )
+
+				// teardown
+				var feats = deletefeature( id )
+				deletetestuser( usr )
+				// end teardown
+		}
+  </script>
+</head>
+<body>
+</body>
+</html>
+
