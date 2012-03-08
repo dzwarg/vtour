@@ -42,14 +42,24 @@
     is in the upper right hand corner.  Go ahead and find your place now.
     I'll wait.</p>
 
-    <div style="text-align:center;"><img src="search2.gif" alt="Search for 'new york, ny'"/></div>
+    <div class="centered">
+      <img src="search2.gif" alt="Search for 'new york, ny'"/>
+    </div>
 
     <p>By the way, if at any point, you want to start again from scratch,
     click on the "Start Over" button at the top.</p>
 
+    <div class="centered">
+      <img src="startover.png" alt="Start Over button"/>
+    </div>
+
     <p>Now that you've found a place to investigate, start clicking on the
     map.  Each click will place a marker, and search flickr for photographs
     near the place you clicked.</p>
+
+    <div class="centered">
+      <img src="marker.png" alt="Marker"/>
+    </div>
 
     <p>As you are clicking around, photos taken near the markers will appear
     in the light strip below the map. To view a larger version of an image,
@@ -58,6 +68,10 @@
     <p>Below the strip of images, the number of total photos found near this
     point will be displayed.  Also, this will show you which set of images in
     the search result you are viewing.</p>
+
+    <div class="centered">
+      <img src="paging.png" alt="Viewing Image Set"/>
+    </div>
 
     <p>To move forward or back in your "tour", click on the right or left
     side of the light box, respectively.</p>
@@ -70,13 +84,17 @@
 </div>
 
 <div id="lightslide">
-  <div id="prevPhotos">
+  <div id="prevPhotos" onmouseover="showTooltip(event,'Previous','R');"
+       onmouseout="hideTooltip();">
     <div class="slideButton" onclick="prevPoint();">&larr;</div>
   </div>
 
   <div id="photos"></div>
 
-  <div id="nextPhotos">
+  <div id="nextPhotos" class="tooltip">
+    <div class="tooltipText">
+      Next
+    </div>
     <div class="slideButton" onclick="nextPoint();">&rarr;</div>
   </div>
 </div>
@@ -87,6 +105,9 @@
 
 <div id="waiting">
   Fetching images: <img src="progress.gif"/>
+</div>
+
+<div id="tooltip">
 </div>
 
 <div id="debug">

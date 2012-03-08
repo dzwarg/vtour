@@ -32,13 +32,16 @@ Tour.prototype.removePoint = function( index )
     var cont = pt.PhotoPanel.parentNode;
     cont.removeChild( pt.PhotoPanel );
 
-    if( index == this.TourPoints.length )
+    if ( this.TourPoints.length > 0 )
     {
-      this.TourPoints[ index - 1 ].PhotoPanel.style.display = 'block';
-    }
-    else
-    {
-      this.TourPoints[ index ].PhotoPanel.style.display = 'block';
+      if( index == this.TourPoints.length )
+      {
+        this.TourPoints[ index - 1 ].PhotoPanel.style.display = 'block';
+      }
+      else
+      {
+        this.TourPoints[ index ].PhotoPanel.style.display = 'block';
+      }
     }
 
     pt.UpdatePhotoPaging( cont );
@@ -359,7 +362,14 @@ TourPoint.prototype.UpdatePhotoPaging = function( container )
 
   var current = document.getElementById('pagerNow');
   current.removeChild( current.firstChild );
-  current.appendChild( document.createTextNode( index+1 ) );
+  if ( container.childNodes.length > 0 )
+  {
+    current.appendChild( document.createTextNode( index+1 ) );
+  }
+  else
+  {
+    current.appendChild( document.createTextNode( index ) );
+  }
 
   var total = document.getElementById('pagerTotal');
   total.removeChild( total.firstChild );

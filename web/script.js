@@ -12,6 +12,9 @@ var tour = new Tour();
 var mapEvt = null;
 var waitQueue = new Array();
 
+// A tooltip panel
+var tooltip;
+
 function setup()
 {
   map = new YMap(document.getElementById('map'));
@@ -47,6 +50,8 @@ function setup()
   });
 
   document.getElementById('place').focus();
+
+  tooltip = document.getElementById('tooltip');
 }
 
 // mouse click capture function
@@ -438,19 +443,34 @@ function closeHelp( event )
 // Show and hide tooltip window.
 //
 //
+var tooltipTimeout;
+
 function showTooltip(event,text,align)
 {
-  var tooltip = document.getElementById('tooltip');
+  var x = event.clientX;
+  var y = event.clientY;
 
-  tooltip.innerHTML = text;
-  tooltip.style.display = 'block';
-  
-  tooltip.style.left = event.clientX + "px";
-  tooltip.style.top = event.clientY + "px";
+  tooltipTimeout = setTimeout( function(){
+    tooltip.innerHTML = text;
+    tooltip.style.display = 'block';
+ 
+    if ( align == 'R' )
+    { 
+      tooltip.style.left = (x+5) + 'px';
+    }
+    else
+    {
+      tooltip.style.left = (x-(5+tooltip.clientWidth)) + 'px';
+    }
+    tooltip.style.top = (y+5) + 'px';
+
+    clearTimeout( tooltipTimeout );
+  }, 500 );
 }
 
 function hideTooltip()
 {
-  var tooltip = document.getElementById('tooltip');
+  if ( tooltipTimeout != null ) clearTimeout( tooltipTimeout );
+
   tooltip.style.display = 'none';
 }

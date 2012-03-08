@@ -19,7 +19,7 @@ body
 {
   background:#ffffff url(bkg.jpg) repeat-x fixed top;
 }
-h1
+h1.pagetitle
 {
   display:inline;
   color:#000099;
@@ -113,9 +113,18 @@ h1
 }
 #waiting
 {
-  z-index:1;
+  position:absolute;
+  bottom:0em; 
+  right:0em;
   display:none;
   text-align:center;
+  background-color:#ffffbb;
+  color:#000099;
+  opacity:0.75;
+  padding:0.25em;
+}
+div#close {
+  float:right;
 }
 .photoItem
 {
