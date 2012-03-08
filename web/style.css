@@ -199,3 +199,7 @@ img.view {
 div.dynhelp {
   display:none;
 }
+div.photoPopup
+{
+  padding:5px;
+}
