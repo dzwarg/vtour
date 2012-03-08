@@ -1,4 +1,4 @@
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ext="http://www.extjs.com/">
 <head>
   <title>vTour</title>
 
@@ -8,9 +8,12 @@
   <script type="text/javascript" src="ext-2.0.2/adapter/ext/ext-base.js"></script>
   <script type="text/javascript" src="ext-2.0.2/ext-all.js"></script>
   <script type="text/javascript" src="FlickrPagingToolbar.js"></script>
+  <script type="text/javascript" src="json2.js"></script>
   <script type="text/javascript">
-    var vtour = {};
-    vtour.flickrkey='FLICKR-KEY';
+    var vtour = {
+      flickrkey:'FLICKR-KEY',
+      fsurl:'http://www.spondubone.net/fs/featureserver.cgi'
+    }
 
     Ext.onReady(function(){
 
@@ -18,17 +21,102 @@
       Ext.state.Manager.setProvider( state );
       
       var welcomeTemplate = new Ext.Template( 'Welcome, {0}' );
+      var TourRecord = Ext.data.Record.create([ 'name', 'id', 'bbox' ]);
+      var myTourStore = new Ext.data.SimpleStore({
+        fields: [ 'name', 'id', 'bbox' ],
+        data: []
+      });
+
+      var tourCombo = new Ext.form.ComboBox({
+        store: myTourStore,
+        displayField: 'name',
+        mode: 'local',
+        triggerAction: 'all',
+        emptyText: 'Select Tour...',
+        width: 145,
+        fieldLabel: 'Tour',
+        labelStyle: 'padding-left:2px;width:43px;',
+        valueNotFoundText: 'Loading...',
+        editable: false,
+        sortInfo: { field: 'name', direction: 'ASC' },
+        listeners: {
+          select: function(combo,record,index) {
+            while (vtour.results.getComponent(1) != null) {
+              vtour.results.remove( vtour.results.getComponent(1) );
+            }
+
+            new OpenLayers.Ajax.Request(vtour.fsurl + '/search?queryable=tour' +
+              '&tour='+record.get('id')+'&format=geojson', {
+              method: 'get', 
+              requestHeaders: ['Accept', 'application/json'],
+              asynchronous: true,
+              onSuccess: function( xhr ){
+                var searches = vtour.geojson.read( xhr.responseText, 'FeatureCollection' );
+
+                for( var i = 0; i < searches.length; i++ ) {
+                  searches[i].attributes.searchElem = '';
+                  searches[i].style = {
+                    fillColor: '#fff',
+                    fillOpacity: 0.2,
+                    strokeColor: '#333',
+                    strokeOpacity: 0.5,
+                    strokeWidth: 1,
+                    strokeLinecap: 'round'
+                  }
+                }
+
+                var index = 0;
+                var addSearchToDisplay = function(comp){
+                  if ( index < searches.length ) {
+                    if ( comp ) {
+                      var dom = comp.getEl().dom;
+                      var imgs = Ext.DomQuery.select( 'img', dom );
+                      var paging = Ext.DomQuery.select( 'div.x-paging-info', dom );
+
+                      if ( paging.length == 0 ) {
+                        setTimeout( function(){ addSearchToDisplay(comp); }, 100 );
+                        return;
+                      }
+
+                      if( imgs.length == 0 && !paging[0].innerHTML.match( /No images.*/ ) ) {
+                        setTimeout( function(){ addSearchToDisplay(comp); }, 100 );
+                        return;
+                      }
+                    }
+
+                    var prjBounds = vtour.projectBounds( searches[index].geometry.getBounds(), true );
+                    index++; 
+                    vtour.getFlickrPhotos( prjBounds.toBBOX(), searches[index-1] );
+                  }
+                  else {
+                    vtour.results.un('render',addSearchToDisplay,window);
+                  }
+                };
+
+                vtour.results.on('render',addSearchToDisplay,window);
+
+                // add this search feature to the map
+                vtour.ol_layers['features'].addFeatures(searches);
+
+                addSearchToDisplay( null );
+              }
+            });
+          }
+        }
+      });
 
       var loggedInPanel = new Ext.FormPanel({
         title:'My Account',
         collapsed: false,
+        labelWidth: 43,
         items: [
           new Ext.Panel({
             id: 'welcomePanel',
             border:false,
             html: '',
             style: 'margin:0px 0px 5px 0px; padding: 2px;'
-          })
+          }),
+          tourCombo
         ]
       });
       
@@ -82,8 +170,39 @@
                 // save auth cookie
                 state.set( 'vtour_secret', action.result.secret );
                 state.set( 'vtour_user', action.result.user.login );
+                state.set( 'vtour_userid', action.result.user.id );
                 
                 Ext.get('welcomePanel').update( welcomeTemplate.apply( [action.result.user.login] ) );
+
+                tourCombo.setValue( 'Loading...' );
+
+                // get all tours owned by this user
+                new OpenLayers.Ajax.Request(vtour.fsurl + '/tour?queryable=user_id' +
+                  '&user_id='+action.result.user.id + '&format=geojson', {
+                  method: 'get', 
+                  requestHeaders: ['Accept', 'application/json'],
+                  asynchronous: true,
+                  onSuccess: function( xhr ){
+                    var tours = vtour.geojson.read( xhr.responseText, 'FeatureCollection' );
+
+                    var tourRecs = [];
+                    var tourState = [];
+                    for ( var i = 0; i < tours.length; i++ ) {
+                      tourRecs.push( new TourRecord({
+                        name: tours[i].attributes.name,
+                        id: tours[i].fid,
+                        bbox: tours[i].geometry.getBounds().toBBOX()
+                      }) );
+
+                      tourState.push( tours[i].fid + ':' + tours[i].attributes.name );
+                    }
+
+                    myTourStore.add( tourRecs );
+                    state.set( 'vtour_tours', tourState.join(';') );
+
+                    tourCombo.reset();
+                  }
+                });
               }
             });
           }
@@ -236,6 +355,10 @@
           // clear cookies
           state.clear( 'vtour_secret' );
           state.clear( 'vtour_user' );
+          state.clear( 'vtour_userid' );
+          state.clear( 'vtour_tours' );
+
+          myTourStore.removeAll();
                         
           loggedInPanel.hide();
           loginPanel.show();
@@ -319,7 +442,148 @@
 	  vtour.tagPanel
         ]
       });
+
+      var firstPanelSwitch = function(panel,instr){
+        var loggedin = state.get( 'vtour_user', '' ) !== '';
+	if ( loggedin && instr ) {
+	  panel.setTitle( 'Tour Options' );
+	  panel.items.get(0).hide();
+	  panel.items.get(1).show();
+	}
+	else {
+	  panel.setTitle( 'Instructions' );
+	  panel.items.get(0).show();
+	  panel.items.get(1).hide();
+	}
+      };
+
+      var saveResultHandler = function( userId, attributes ) {
+        return function( resp ) {
+          var search = vtour.geojson.read( resp.responseText, 'FeatureCollection' );
+
+          // loop through all markers, and process only the ones in the search
+          var markers = vtour.ol_layers['markers'].features;
+          for ( var i = 0; i < markers.length; i++ ) {
+            if ( markers[i].attributes.searchElem == attributes.searchElem )
+              // todo: add thumb_url, image_url, name
+              vtour.saveResult( userId, 
+                search[0].fid,
+                markers[i].attributes.searchDetail,
+                markers[i].geometry, 
+                function(r){}, 
+                function(r){
+                  Ext.MessageBox.alert( 'Oops', 'Could not save result' );
+                }
+              );
+          }
+        };
+      };
+
+      var saveSearchHandler = function( userId ) {
+        return function( resp ) {
+          var tour = vtour.geojson.read( resp.responseText, 'FeatureCollection' );
+
+          var boxes = vtour.ol_layers['features'].features;
+          for ( var i = 0; i < boxes.length; i++ ) {
+            vtour.saveSearch( userId, tour[0].fid,
+              boxes[i].geometry,
+              saveResultHandler( userId, boxes[i].attributes ),
+              function( resp ) {
+                Ext.MessageBox.alert( 'Oops', 'Could not save searches' );
+              }
+            )
+          }
+
+          // disable save button, indicate that the tour has been saved
+          tourMgmtPanel.buttons[0].enable();
+          tourMgmtPanel.buttons[0].setText('Save');
+
+          Ext.MessageBox.alert( 'Yay!', 'Your tour has been saved.' );
+
+          var tRec = new TourRecord({ 
+            name: tour[0].attributes.name, 
+            id: tour[0].fid,
+            bbox: tour[0].geometry.getBounds().toBBOX()
+          });
+          myTourStore.add( [tRec] );
+          var tourSet = state.get( 'vtour_tours', '' );
+          tourSet += tRec.get('id') + ':' + tRec.get('name');
+          state.set( 'vtour_tours', tourSet );
+        };
+      };
+
+      var saveTourHandler = function(form){
+        return function( btn, evt ) {
+          if ( !form.isValid() ) return;
+
+          // disable the button
+          btn.disable();
+          btn.setText('Saving...');
+
+          var tourName = form.findField('name').getValue();
+
+          var id = state.get( 'vtour_userid', 0 );
+          vtour.saveTour( id, tourName, new Date(),
+            saveSearchHandler( id ),
+            function( resp ){
+              Ext.MessageBox.alert( 'Oops',
+                'Error saving tour, please try again later.' );
+            }
+          );
+        };
+      };
       
+      var tourMgmtPanel = new Ext.form.FormPanel({
+	// provide tour management
+	border: false,
+	bodyStyle: 'padding:2px;',
+	width:700,
+        height:140,
+	labelAlign: 'right',
+	labelWidth: 100,
+	items:[
+	  {
+	    border: false,
+	      html: '<h2>Save This Tour</h2><p>Saving a tour will save ' +
+	      'the searches that are currently open in the tabs.  The ' +
+	      'photo urls are saved, in addition to the places where the ' +
+	      'searches took place. To save these searches as a tour, ' +
+	      'enter a name below and click the "Save" button.'
+	  },
+	  new Ext.form.TextField({
+	    fieldLabel: 'Name',
+	    name: 'name',
+	    width: 200,
+	    style: 'padding-top:5px',
+            invalidText: 'Enter a name for the tour. Each tour must have a unique name.',
+            validator: function( newVal ) {
+              if ( newVal === '' ) return false;
+
+              var valid = false;
+
+              new OpenLayers.Ajax.Request(vtour.fsurl + '/tour?queryable=name,user_id' +
+                '&name='+newVal+'&user_id='+state.get('vtour_userid')+'&format=geojson', {
+                method: 'get', 
+                requestHeaders: ['Accept', 'application/json'],
+                asynchronous: false,
+                onSuccess: function( xhr ){ 
+                  var resp = vtour.geojson.read( xhr.responseText, 'FeatureCollection' );
+                  valid = (resp.length === 0); 
+                }
+              });
+
+              return valid;
+            }
+	  })
+	]
+      });
+
+      tourMgmtPanel.addButton({
+        text: 'Save',
+        style: 'padding:5px 0px 0px 105px;',
+        handler: saveTourHandler( tourMgmtPanel.getForm() )
+      });
+
       vtour.results = new Ext.TabPanel({
         id:'resultTabs',
         visible: false,
@@ -331,27 +595,35 @@
           autoScroll: true, 
           closable: true
         },
-        items: [ { 
+        items: [{ 
           title: 'Instructions', 
-          contentEl: 'south',
-          closable: false
-        } ],
+          closable: false,
+	  items: [{
+	    border: false,
+	    contentEl: 'south'
+	  }, tourMgmtPanel ]
+        }],
         listeners: {
           'beforeremove': function( me, child ){
             var i = me.items.findIndex( 'id', child.id );
-            if( i > 0 ) {
-              vtour.ol_layers['features'].removeFeatures(
-                vtour.ol_layers['features'].features.slice( i-1, i )
-              );
+	    vtour.ol_layers['features'].removeFeatures(
+	      vtour.ol_layers['features'].features.slice( i-1, i )
+	    );
               
-              for ( var j = vtour.ol_layers['markers'].features.length - 1; j >= 0; j-- ) {
-                var feature = vtour.ol_layers['markers'].features[j];
-                if ( feature.searchId == child.id ) {
-                  vtour.ol_layers['markers'].removeFeatures( [feature] );
-                }
-              }
-            }
-          }
+	    for ( var j = vtour.ol_layers['markers'].features.length - 1; j >= 0; j-- ) {
+	      var feature = vtour.ol_layers['markers'].features[j];
+              OpenLayers.Console.debug('Testing marker '+feature.attributes.searchElem);
+	      if ( feature.attributes.searchElem == child.id ) {
+                OpenLayers.Console.debug('Removing marker feature '+child.id);
+		vtour.ol_layers['markers'].removeFeatures( [feature] );
+	      }
+	    }
+
+	    firstPanelSwitch( me.items.get(0), me.items.getCount()>2 );
+          },
+	  'add': function( me, child, idx ) {
+	    firstPanelSwitch( me.items.get(0), idx > 0 );
+	  }
         }
       });
 
@@ -385,15 +657,52 @@
       }
       else {
         loginPanel.hide();
+
+        Ext.get('welcomePanel').update( welcomeTemplate.apply( [state.get('vtour_user')] ) );
+
+        var tourState = state.get( 'vtour_tours', '' ).split(/;/);
+        var tours = [];
+        for ( var i = 0; i < tourState.length; i++ ) {
+          var tInfo = tourState[i].split(/:/);
+          tours.push( new TourRecord( { id: tInfo[0], name: tInfo[1] } ) );
+        }
+
+        myTourStore.add( tours );
       }
 
       viewport.on( {
         'resize': function( obj, adjWidth, adjHeight, rawWidth, rawHeight ){ 
           if ( ol_resize ) {
+	    vtour.setMapHeight();
             ol_resize();
           }
         }
       });
+
+      // add the click handler to the results item
+      Ext.fly(vtour.results.el.id).on( 'click',function( e ) {
+        e.stopEvent();
+        var target = e.getTarget('div.thumb');
+        if ( target ) {
+          var detail = {
+            tags: target.getAttribute( 'ext:tags' ),
+            position: {
+              lon: parseFloat(target.getAttribute( 'ext:position' ).split(',')[0]),
+              lat: parseFloat(target.getAttribute( 'ext:position' ).split(',')[1])
+            },
+            image: (function(img){
+	      var i = new Image();
+	      i.src = img;
+	      return i;
+	    })(target.getAttribute( 'ext:image' ) ),
+            title: target.getAttribute( 'ext:title' ),
+	    imageid: target.getAttribute( 'ext:imageid' ),
+	    owner: target.getAttribute( 'ext:owner' )
+          }
+          
+          vtour.showDetail( detail );
+        }
+      }); 
       
       // create the script tag proxy for loading the results.  all flickr photo
       // searches will use this same proxy object
@@ -431,20 +740,21 @@
       vtour.searchTpl = new Ext.XTemplate( 
         '<tpl for=".">',
         '<div class="thumb-wrap" id="{title}">',
-		    '<div class="thumb" ext:position="{longitude},{latitude}" ',
-		    'ext:tags="{tags}" ext:image="{imageurl}" ext:title="{title}" ',
-		    'ext:imageid="{id}" ext:owner="{owner}">',
-		    '<img src="{thumburl}" title="{title}"></div>',
-		    '<span class="x-editable">{title}</span></div>',
+        '<div class="thumb" ext:position="{longitude},{latitude}" ',
+        'ext:tags="{tags}" ext:image="{imageurl}" ext:title="{title}" ',
+        'ext:imageid="{id}" ext:owner="{owner}">',
+        '<img src="{thumburl}" title="{title}"></div>',
+        '<span class="x-editable">{title}</span></div>',
         '</tpl>',
         '<div class="x-clear"></div>'
       );
-
-      setTimeout( ol_init, 1 );
     });
     
-    vtour.getFlickrPhotos = function( bbox ) {    
+    vtour.getFlickrPhotos = function( bbox, boxFeature ) {
       var frm = vtour.datePanel.getForm();
+
+      // TODO: take these out of this method, and put these settings into
+      // the search record
       var fromDate = frm.findField( 'fromDate' ).getValue();
       var toDate = frm.findField( 'toDate' ).getValue();
       frm = vtour.tagPanel.getForm();
@@ -510,49 +820,42 @@
             var layer = vtour.ol_layers['features'];
             var index = vtour.results.items.findIndex( 'id', p.id );
             var feature = (layer.features.slice( index-1, index ))[0];
-            new OpenLayers.Tween().start( 
+            var tween = new OpenLayers.Tween();
+            tween.start( 
               { t: 255 }, 
               { t: 0 }, 
-              50, 
+              20, 
               {
                 callbacks: {
                   eachStep: function( val ){ 
-                    feature.style.fillOpacity = 0.2 + (val['t'] / 255) * 0.8; 
-                    layer.redraw();
+                    if( feature ){
+                      feature.style.fillOpacity = 0.2 + (val['t'] / 255) * 0.8; 
+                      layer.redraw();
+                    }
+                    else {
+                      tween.stop();
+                    }
                   }
                 }
               }
             ); // end tween.start
+          },
+          'render': function(rendered){
+            vtour.results.fireEvent('render',rendered);
           }
         }
       }); // end ext.panel
       
-      Ext.fly(vtour.results.el.id).on( 'click',function( e ) {
-        e.stopEvent();
-        var target = e.getTarget('div.thumb');
-        if ( target ) {
-          var detail = {
-            tags: target.getAttributeNS( '', 'ext:tags' ),
-            position: {
-              lon: parseFloat(target.getAttributeNS( '', 'ext:position' ).split(',')[0]),
-              lat: parseFloat(target.getAttributeNS( '', 'ext:position' ).split(',')[1])
-            },
-            image: (function(img){
-	      var i = new Image();
-	      i.src = img;
-	      return i;
-	    })(target.getAttributeNS( '', 'ext:image' ) ),
-            title: target.getAttributeNS( '', 'ext:title' ),
-	    imageid: target.getAttributeNS( '', 'ext:imageid' ),
-	    owner: target.getAttributeNS( '', 'ext:owner' )
-          }
-          
-          showDetail( detail );
-        }
-      }); 
-              
+      boxFeature.attributes.searchElem = oneSearchPanel.id;
+
       // show results
       vtour.results.add( oneSearchPanel ).show();      
+    }
+
+    vtour.setMapHeight = function(){
+      // compute the size of the map div for IE/safari/etc
+      var mElem = Ext.get(Ext.get('mapDiv').dom.parentNode.parentNode);
+      document.getElementById( 'mapDiv' ).style.height = mElem.getComputedHeight() + 'px';
     }
 	</script>
   <style type="text/css">
@@ -601,12 +904,14 @@
     }
 
     .images-view .x-view-over{
+	background: #efefef;
 	border:1px solid #dddddd;
 	padding: 1px;
     }
 
     .images-view .x-view-selected{
-    	border:1px solid #99bbe8;
+        background: #dedede;
+    	border:1px solid #cccccc;
     	padding: 1px;
     }
     .images-view .x-view-selected .thumb{
@@ -632,6 +937,7 @@
 <!-- end ExtJS scripts -->
 
 <!-- OpenLayers scripts -->
+  <script type="text/javascript" src="OpenLayers-2.7/lib/Firebug/firebug.js"></script>
   <script type="text/javascript" src="OpenLayers-2.7/OpenLayers.js"></script>
   <script type="text/javascript" src="OpenLayers-2.6/lib/Proj4js/proj4js.js"></script>
   <script type="text/javascript" src="http://api.maps.yahoo.com/ajaxymap?v=3.7&appid=APP-ID"></script>
@@ -648,6 +954,13 @@
       };
 
       vtour.boxWidth = 20;
+      vtour.setMapHeight();
+
+      vtour.geojson = new OpenLayers.Format.GeoJSON({
+        externalProjection:options.displayProjection,
+        internalProjection:options.projection
+      });
+
       vtour.ol_map = new OpenLayers.Map('mapDiv', options);
 
       vtour.ol_map.addControl(new OpenLayers.Control.KeyboardDefaults());
@@ -660,15 +973,18 @@
           "Marker Drop Shadows",
           {
             styleMap: new OpenLayers.StyleMap({
-              default: {
+              'default': {
                 // Set the external graphic and background graphic images.
                 externalGraphic: "OpenLayers-2.6/img/marker-gold.png",
                 backgroundGraphic: "OpenLayers-2.6/img/marker_shadow.png",
+
+                graphicXOffset: -10,
+                graphicYOffset: -21,
                 
                 // Makes sure the background graphic is placed correctly relative
                 // to the external graphic.
                 backgroundXOffset: 0,
-                backgroundYOffset: -7,
+                backgroundYOffset: -17,
                 
                 // Set the z-indexes of both graphics to make sure the background
                 // graphics stay in the background (shadows on top of markers looks
@@ -696,26 +1012,35 @@
         vtour.ol_layers['markers'],
         {
           onSelect: function (feature) {
-	    // feature has a property 'searchDetail' that contains:
+	    // feature has an attribute 'searchDetail' that contains:
 	    // title, position, tags, image
+            var detail = feature.attributes.searchDetail;
             var popup = new OpenLayers.Popup.FramedCloud(
               "photo", 
               feature.geometry.getBounds().getCenterLonLat(),
               null,
-              '<div style="width:' + (feature.searchDetail.image.width+6) + 'px;" class="detail">' +
-		'<h2 class="detail">' + feature.searchDetail.title +  '</h2>' +
-		'<img src="' + feature.searchDetail.image.src + '" alt="' + feature.searchDetail.title +
-		'" title="' + feature.searchDetail.title + '" width="' + feature.searchDetail.image.width +
-		'" height="' + feature.searchDetail.height + '" class="detail"/>' +
-		'<div class="detaillink"><a href="http://www.flickr.com/photos/' + feature.searchDetail.owner + '/' + 
-		feature.searchDetail.imageid + '" target="_blank" class="detail">photopage</a></div>' +
-		'<p class="detail"><span class="detail">tags</span>:' + feature.searchDetail.tags + '</p>' +
+              '<div style="width:' + (detail.image.width+6) + 'px;" class="detail">' +
+		'<h2 class="detail">' + detail.title +  '</h2>' +
+                '<div><input type="checkbox" id="' + feature.id + '_delme" name="' + feature.id + '_delme"/> ' + 
+                '<label for="' + feature.id + '_delme">hide</label></div>' +
+		'<img src="' + detail.image.src + '" alt="' + detail.title +
+		'" title="' + detail.title + '" width="' + detail.image.width +
+		'" height="' + detail.height + '" class="detail"/>' +
+		'<div class="detaillink"><a href="http://www.flickr.com/photos/' + detail.owner + '/' + 
+		detail.imageid + '" target="_blank" class="detail">photopage</a></div>' +
+		'<p class="detail"><span class="detail">tags</span>:' + detail.tags + '</p>' +
 		'</div>',
               null, 
               true, 
               function (evt) {
+                var chk = Ext.get(feature.id+'_delme'); 
+                var remove = chk.dom.checked;
                 OpenLayers.Event.stop(evt);
                 selectControl.unselect(feature);
+
+                if (remove) { 
+                  vtour.ol_layers['markers'].removeFeatures( [feature] );
+                }
               }
             );
               
@@ -764,16 +1089,12 @@
 
       var sz = Math.min( bounds.getWidth(), bounds.getHeight() ) / vtour.boxWidth;
 
-      var pointList = [];
-      pointList.push( new OpenLayers.Geometry.Point( lonlat.lon - sz, lonlat.lat - sz ) );
-      pointList.push( new OpenLayers.Geometry.Point( lonlat.lon - sz, lonlat.lat + sz ) );
-      pointList.push( new OpenLayers.Geometry.Point( lonlat.lon + sz, lonlat.lat + sz ) );
-      pointList.push( new OpenLayers.Geometry.Point( lonlat.lon + sz, lonlat.lat - sz ) );
-      pointList.push( pointList[0] );
+      var myBounds = new OpenLayers.Bounds( lonlat.lon-sz, lonlat.lat-sz,
+	lonlat.lon+sz, lonlat.lat+sz );
       
-      var linearRing = new OpenLayers.Geometry.LinearRing( pointList );
+      var rectangle = myBounds.toGeometry();
       var polygonFeature = new OpenLayers.Feature.Vector(
-        new OpenLayers.Geometry.Polygon([linearRing]), null, {
+        rectangle, { searchElem: '' }, {
           fillColor: '#fff',
           fillOpacity: 0.2,
           strokeColor: '#333',
@@ -784,22 +1105,29 @@
 
       vtour.ol_layers['features'].addFeatures([polygonFeature]);
 
-      var ptMin = Proj4js.transform( 
-        vtour.ol_map.projection.proj, 
-        vtour.ol_map.displayProjection.proj, 
-        { x: lonlat.lon - sz, y: lonlat.lat - sz } );
-      var ptMax = Proj4js.transform(
-        vtour.ol_map.projection.proj,
-        vtour.ol_map.displayProjection.proj,
-        { x: lonlat.lon + sz, y: lonlat.lat + sz } );
-      
-      var bbox = ptMin.x.toString() + ',' + ptMin.y.toString() + ',' +
-        ptMax.x.toString() + ',' + ptMax.y.toString();
+      var prjBounds = vtour.projectBounds( myBounds, true );
         
-      vtour.getFlickrPhotos( bbox );
-    }
+      vtour.getFlickrPhotos( prjBounds.toBBOX(), polygonFeature );
+    };
+
+    vtour.projectBounds = function( bounds, fwd ) {
+      var pts = bounds.toArray();
+      var fromProj = (fwd) ? vtour.ol_map.projection.proj : vtour.ol_map.displayProjection.proj;
+      var toProj = (fwd) ? vtour.ol_map.displayProjection.proj : vtour.ol_map.projection.proj;
+      
+      var ptMin = Proj4js.transform( 
+        fromProj, 
+        toProj,
+        { x: pts[0], y: pts[1] } );
+      var ptMax = Proj4js.transform(
+        fromProj,
+        toProj,
+        { x: pts[2], y: pts[3] } );
+
+      return new OpenLayers.Bounds( ptMin.x, ptMin.y, ptMax.x, ptMax.y );
+    };
     
-    function showDetail( detail ) {
+    vtour.showDetail = function( detail ) {
       // put something on the map
       
       // reproject from 4326
@@ -810,15 +1138,85 @@
       
       // create a feature array of 1 item
       var feature = new OpenLayers.Feature.Vector(
-        new OpenLayers.Geometry.Point(pt.x, pt.y)
+        new OpenLayers.Geometry.Point(pt.x, pt.y),
+        {
+          searchElem: vtour.results.activeTab.el.id,
+          searchDetail: detail
+        }
       );
-      
-      feature.searchId = vtour.results.activeTab.el.id;
-      feature.searchDetail = detail;
-      
+
       // attach to the feature layer
       vtour.ol_layers['markers'].addFeatures( [feature] );
     }
+
+    vtour.saveTour = function( id, name, date, success, failure ) {
+      // create a bounding box, that would be the bounds of all searches
+      var allBounds = new OpenLayers.Bounds();
+      var feature = null;
+      for( var i = 0; i < vtour.ol_layers['features'].features.length; i++ ) {
+        feature = vtour.ol_layers['features'].features[i];
+        allBounds.extend(feature.geometry.getBounds());
+      }
+
+      feature = new OpenLayers.Feature.Vector( allBounds.toGeometry(),
+	{
+	  user_id: id,
+	  name: name,
+	  date: date.format('Y-m-d'),
+	  public: false
+	}
+      ); 
+
+      new OpenLayers.Ajax.Request(vtour.fsurl + '/tour?format=geojson', {
+	method: 'post', 
+	postBody: vtour.geojson.write(feature),
+	requestHeaders: ['Accept', 'application/json'],
+	asynchronous: false,
+	onSuccess: success,
+	onFailure: failure
+      });
+    };
+
+    vtour.saveSearch = function( userId, tourId, geometry, success, failure ) {
+      // create a bounding box
+      var feat = new OpenLayers.Feature.Vector( geometry, {
+        user_id: userId,
+        tour: tourId
+      });
+
+      new OpenLayers.Ajax.Request(vtour.fsurl + '/search?format=geojson', {
+        method: 'post',
+        postBody: vtour.geojson.write(feat),
+        requestHeaders: ['Accept', 'application/json'],
+        asynchronous: false,
+        onSuccess: success,
+        onFailure: failure
+      });
+    };
+
+    vtour.saveResult = function( userId, searchId, details, geometry, success, failure ) {
+      // create a point
+      var center = geometry.getBounds().getCenterLonLat();
+      var feat = new OpenLayers.Feature.Vector(
+        new OpenLayers.Geometry.Point( center.lon, center.lat ),
+        {
+          user_id: userId,
+          search: searchId,
+          thumb_url: details.image.src,
+          name: details.title,
+          page_url: 'http://www.flickr.com/photos/' + details.owner + '/' + details.imageid
+        }
+      );
+
+      new OpenLayers.Ajax.Request(vtour.fsurl + '/result', {
+        method: 'post',
+        postBody: vtour.geojson.write(feat),
+        requestHeaders: ['Accept', 'application/json'],
+        asynchronous: false,
+        onSuccess: success,
+        onFailure: failure
+      });
+    };
   </script>
   <style type="text/css">
     div#mapDiv {
@@ -846,10 +1244,17 @@
     a.detail {
       font-size:0.7em;
     }
+    div.detail label {
+      font-size:0.7em;
+      vertical-align:top;
+    }
+    div.detail div {
+      text-align:right;
+    }
   </style>
 <!-- end OpenLayers scripts -->
 </head>
-<body>
+<body onload="ol_init();">
   <div id="center">
     <div id="mapDiv">
     </div>
