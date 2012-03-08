@@ -5,11 +5,15 @@
   <!-- ExtJS scripts -->
   <link rel="stylesheet" type="text/css" href="ext-2.0.2/resources/css/ext-all.css" />
   <link rel="stylesheet" type="text/css" href="ext-2.0.2/resources/css/xtheme-gray.css" />
+  <style type="text/css">
+    body { font-family: 'Tahoma','Arial','Helvetica','sans-serif'; }
+  </style>
   <script type="text/javascript" src="ext-2.0.2/adapter/ext/ext-base.js"></script>
   <script type="text/javascript" src="ext-2.0.2/ext-all.js"></script>
   <script type="text/javascript" src="FlickrPagingToolbar.js"></script>
   <script type="text/javascript" src="json2.js"></script>
   <script type="text/javascript">
+    Ext.BLANK_IMAGE_URL = 's.gif';
     var vtour = {
       flickrkey:'FLICKR-KEY',
       fsurl:'http://www.spondubone.net/fs/featureserver.cgi'
@@ -441,7 +445,12 @@
           allowBlank: false,
           width: 60,
           fieldLabel: 'From',
-          value: '01/01/08',
+          value: (function(){
+            var d=new Date();
+            d = new Date(d.valueOf() + 24*60*60*1000);
+            d.setFullYear( d.getFullYear()-1 );
+            return d;
+          })(),
           maxValue: new Date(),
           minValue: (function(){
             var d = new Date();
@@ -453,7 +462,7 @@
           allowBlank: false,
           width: 60,
           fieldLabel: 'To',
-          value: '09/17/08',
+          value: new Date(),
           maxValue: new Date(),
           minValue: (function(){
             var d = new Date();
@@ -558,8 +567,8 @@
           }
 
           // disable save button, indicate that the tour has been saved
-          tourMgmtPanel.buttons[0].enable();
-          tourMgmtPanel.buttons[0].setText('Save');
+          tourSaveBtn.enable();
+          tourSaveBtn.setText('Save');
 
           Ext.MessageBox.alert( 'Yay!', 'Your tour has been saved.' );
 
@@ -575,15 +584,19 @@
         };
       };
 
-      var saveTourHandler = function(form){
+      var saveTourHandler = function(frm){
         return function( btn, evt ) {
-          if ( !form.isValid() ) return;
+          if ( !frm.isValid() ) return;
+
+          var tourName = frm.findField('name').getValue();
+          if ( tourName === '' ) {
+            frm.findField('name').markInvalid();
+            return;
+          }
 
           // disable the button
           btn.disable();
           btn.setText('Saving...');
-
-          var tourName = form.findField('name').getValue();
 
           var id = state.get( 'vtour_userid', 0 );
           vtour.saveTour( id, tourName, new Date(),
@@ -595,57 +608,91 @@
           );
         };
       };
+
+      var tourNameField = new Ext.form.TextField({
+        name: 'name',
+        width: 200,
+        invalidText: 'Enter a name for the tour. Each tour must have a unique name.',
+        validator: function( newVal ) {
+          if ( newVal === '' ) return false;
+
+          var valid = false;
+
+          new OpenLayers.Ajax.Request(vtour.fsurl + '/tour?queryable=name,user_id' +
+            '&name='+newVal+'&user_id='+state.get('vtour_userid')+'&format=geojson', {
+            method: 'get', 
+            requestHeaders: ['Accept', 'application/json'],
+            asynchronous: false,
+            onSuccess: function( xhr ){ 
+              var resp = vtour.geojson.read( xhr.responseText, 'FeatureCollection' );
+              valid = (resp.length === 0); 
+            }
+          });
+
+          return valid;
+        }
+      });
+
+      var tourSaveBtn = new Ext.Button({
+        style: 'padding-left:2px;',
+        width: 100,
+        text: 'Save'
+      });
       
       var tourMgmtPanel = new Ext.form.FormPanel({
 	// provide tour management
 	border: false,
 	bodyStyle: 'padding:2px;',
-	width:700,
-        height:140,
-	labelAlign: 'right',
-	labelWidth: 100,
 	items:[
-	  {
-	    border: false,
-	      html: '<h2>Save This Tour</h2><p>Saving a tour will save ' +
-	      'the searches that are currently open in the tabs.  The ' +
-	      'photo urls are saved, in addition to the places where the ' +
-	      'searches took place. To save these searches as a tour, ' +
-	      'enter a name below and click the "Save" button.'
-	  },
-	  new Ext.form.TextField({
-	    fieldLabel: 'Name',
-	    name: 'name',
-	    width: 200,
-	    style: 'padding-top:5px',
-            invalidText: 'Enter a name for the tour. Each tour must have a unique name.',
-            validator: function( newVal ) {
-              if ( newVal === '' ) return false;
-
-              var valid = false;
-
-              new OpenLayers.Ajax.Request(vtour.fsurl + '/tour?queryable=name,user_id' +
-                '&name='+newVal+'&user_id='+state.get('vtour_userid')+'&format=geojson', {
-                method: 'get', 
-                requestHeaders: ['Accept', 'application/json'],
-                asynchronous: false,
-                onSuccess: function( xhr ){ 
-                  var resp = vtour.geojson.read( xhr.responseText, 'FeatureCollection' );
-                  valid = (resp.length === 0); 
+          new Ext.Panel({
+            title: 'Save',
+            collapsible: true,
+            layout: 'column',
+            width: 700,
+            items:[
+              {
+                style: 'padding: 2px 0px 0px 2px;',
+                width: 400,
+                border: false,
+                html: 'To save this tour, enter a name and click "Save".'
+              },
+              tourNameField,
+              tourSaveBtn
+            ]
+          }),
+          new Ext.Panel({
+            title: 'Delete',
+            collapsible: true,
+            layout: 'column',
+            width: 700,
+            items:[
+              {
+                style: 'padding: 2px 0px 0px 2px;',
+                width: 400,
+                border: false,
+                html: 'To delete this tour, click "Delete".'
+              },
+              {
+                border: false,
+                width: 200,
+                html: '&nbsp;'
+              },
+              new Ext.Button({
+                text: 'Delete',
+                style: 'padding-left:2px;',
+                width: 100,
+                handler: function( btn ){
+                  while (vtour.results.getComponent(1) != null) {
+                    vtour.results.remove( vtour.results.getComponent(1) );
+                  }
                 }
-              });
-
-              return valid;
-            }
-	  })
+              })
+            ]
+          })
 	]
       });
 
-      tourMgmtPanel.addButton({
-        text: 'Save',
-        style: 'padding:5px 0px 0px 105px;',
-        handler: saveTourHandler( tourMgmtPanel.getForm() )
-      });
+      tourSaveBtn.on('click', saveTourHandler( tourMgmtPanel.getForm() ) );
 
       vtour.results = new Ext.TabPanel({
         id:'resultTabs',
@@ -675,9 +722,7 @@
               
 	    for ( var j = vtour.ol_layers['markers'].features.length - 1; j >= 0; j-- ) {
 	      var feature = vtour.ol_layers['markers'].features[j];
-              OpenLayers.Console.debug('Testing marker '+feature.attributes.searchElem);
 	      if ( feature.attributes.searchElem == child.id ) {
-                OpenLayers.Console.debug('Removing marker feature '+child.id);
 		vtour.ol_layers['markers'].removeFeatures( [feature] );
 	      }
 	    }
@@ -812,7 +857,67 @@
         '<div class="x-clear"></div>'
       );
     });
-    
+
+    vtour.makeDateMenu = function( initDate, theStore, min ) {
+      var btn = new Ext.Toolbar.Button({ 
+        text: initDate.format('m/d/y'),
+        menu: new Ext.menu.DateMenu({
+          listeners:{ 
+            'beforeshow':function(menu){
+              menu.picker.setValue( initDate );
+            },
+            'select':function(picker,date){
+              btn.setText( date.format('m/d/y') );
+              if ( min ) {
+                theStore.baseParams.min_taken_date = date.format('Y-m-d');
+              }
+              else {
+                theStore.baseParams.max_taken_date = date.format('Y-m-d');
+              }
+            }
+          }
+        }),
+        menuAlign:'br-tr'
+      });
+
+      return btn;
+    };
+
+    vtour.makeTextMenu = function( txt, theStore ) {
+      var txtBtn = new Ext.Toolbar.Button({
+        text: '\''+txt+'\'',
+        handler: function(btn){
+          var l = new Ext.Layer({});
+          var tags = btn.getText().match( /^'(.*)'$/ )[1];
+          
+          l.update('<div class="tagEdit"><input type="text" value="' + tags + '"/></div>');
+          l.show();
+          l.alignTo( btn.el, 'bl-tl' );
+
+          var html = Ext.DomQuery.select( 'div.tagEdit input' );
+          if (html != null && html.length == 1)
+            html[0].focus();
+
+          l.on( 'keypress', function(evt){
+            if ( evt.keyCode == 13 ) {
+              l.hide();
+
+              var theTxt = '';
+              if ( html != null && html.length == 1 )
+                 theTxt = html[0].value;
+                
+              btn.setText( '\'' + theTxt + '\'' );
+              theStore.baseParams.tags = theTxt;
+
+              l.remove();
+            };
+          });
+        }
+      });
+
+      return txtBtn;
+    };
+      
     vtour.getFlickrPhotos = function( bbox, boxFeature, constraints ) {
       var toDate = constraints.todate || new Date();
       var fromDate = constraints.fromdate || (function(){ 
@@ -874,7 +979,26 @@
 	  store: store,
 	  displayInfo: true,
 	  displayMsg: 'Displaying images {0} - {1} of {2}',
-	  emptyMsg: 'No images to display'
+	  emptyMsg: 'No images to display',
+          items:[
+            '-',
+            { xtype: 'tbtext', text: 'From:' },
+            vtour.makeDateMenu( fromDate, store, true ),
+            '-',
+            { xtype: 'tbtext', text: 'To:' },
+            vtour.makeDateMenu( toDate, store, false ),
+            '-',
+            { xtype: 'tbtext', text: 'Tags:' },
+            vtour.makeTextMenu( tags, store )
+          ],
+          listeners: {
+            'beforedestroy': function(cmp){ 
+              // destroy all the items in this toolbar, because something happens
+              // with the menus and buttons that keeps the panel from clearing
+              // if the items are not cleared when the toolbar is destroyed
+              cmp.items.clear();
+            }
+          }
         }),        
         
         listeners: {
@@ -1360,7 +1484,7 @@
       </li>
     </ul>
   </div>
-  <div id="datePanel" class="x-hidden" style="padding:2px;"></div>
+  <div id="datePanel" class="x-hidden">hi!</div>
   <div id="south">
     <p>Click on the map to search for photos.</p>
   </div>
