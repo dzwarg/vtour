@@ -31,6 +31,16 @@ Tour.prototype.removePoint = function( index )
     this.TourPoints.splice( index, 1 );
     var cont = pt.PhotoPanel.parentNode;
     cont.removeChild( pt.PhotoPanel );
+
+    if( index == this.TourPoints.length )
+    {
+      this.TourPoints[ index - 1 ].PhotoPanel.style.display = 'block';
+    }
+    else
+    {
+      this.TourPoints[ index ].PhotoPanel.style.display = 'block';
+    }
+
     pt.UpdatePhotoPaging( cont );
     this.TourPolyline = null;
   }
@@ -160,7 +170,6 @@ TourPoint.prototype.computeBounds = function( map )
 
 TourPoint.prototype.fetchPhotos = function( map, waitingRef )
 {
-  waitingRef(true);
 
   var bbox = this.computeBounds( map );
 
@@ -182,6 +191,8 @@ TourPoint.prototype.fetchPhotos = function( map, waitingRef )
 
 TourPoint.prototype.SendFetchRequest = function ( url, waitingRef )
 {
+  waitingRef(true);
+
   var xmlReq = getXmlRequest();
 
   var caller = this;
@@ -340,9 +351,15 @@ TourPoint.prototype.ShowLastPhotoPanel = function( div )
 
 TourPoint.prototype.UpdatePhotoPaging = function( container )
 {
+  var index = container.childNodes.length;
+  for( var i = 0; i < container.childNodes.length; i++ )
+  {
+    if( container.childNodes[i].style.display == 'block' ) index = i;
+  }
+
   var current = document.getElementById('pagerNow');
   current.removeChild( current.firstChild );
-  current.appendChild( document.createTextNode( container.childNodes.length ) );
+  current.appendChild( document.createTextNode( index+1 ) );
 
   var total = document.getElementById('pagerTotal');
   total.removeChild( total.firstChild );

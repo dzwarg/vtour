@@ -19,7 +19,7 @@
 </div>
 
 <div class="search">
-  <input type="text" name="place" id="place" onkeypress="placeInputEvent(event);" class="gradient"/>
+  <input type="text" name="place" id="place" onkeypress="placeInputEvent(event);" class="gradient" value="Philadelphia, PA"/>
   <input type="button" value="Find" onclick="findPlace();" />
 </div>
 
@@ -28,11 +28,11 @@
   <div id="help">
     <div id="close">
       <a href="#" onclick="closeHelp();">
-        <img src="close.gif" alt="[ X ]" border="0"/>
+        <img src="close.png" alt="[ X ]" border="0"/>
       </a>
     </div>
 
-    <h1>Welcome</h1>
+    <h1 style="display:inline;">Welcome</h1>
 
     <p>Use this map to find photographs that have been geotagged on 
     <a href="http://www.flickr.com/">flickr</a> <a href="#panoramio">*</a>.
@@ -42,10 +42,25 @@
     is in the upper right hand corner.  Go ahead and find your place now.
     I'll wait.</p>
 
+    <div style="text-align:center;"><img src="search2.gif" alt="Search for 'new york, ny'"/></div>
+
+    <p>By the way, if at any point, you want to start again from scratch,
+    click on the "Start Over" button at the top.</p>
+
     <p>Now that you've found a place to investigate, start clicking on the
     map.  Each click will place a marker, and search flickr for photographs
-    near the place you clicked.  When the photos are found, they will appear
-    in the light strip below the map.</p>
+    near the place you clicked.</p>
+
+    <p>As you are clicking around, photos taken near the markers will appear
+    in the light strip below the map. To view a larger version of an image,
+    click on it in the light strip.</p>
+
+    <p>Below the strip of images, the number of total photos found near this
+    point will be displayed.  Also, this will show you which set of images in
+    the search result you are viewing.</p>
+
+    <p>To move forward or back in your "tour", click on the right or left
+    side of the light box, respectively.</p>
 
     <hr/>
 

@@ -32,6 +32,17 @@ h1
   height: 30em;
   width: auto;
 }
+#help {
+  position:absolute;
+  right:4em;
+  width:20em;
+  top:4em;
+  height:25em;
+  background-color:#ffffcc;
+  padding:0.5em;
+  opacity:0.85;
+  overflow-y:auto;
+}
 .actionpanel
 {
   position:absolute;
@@ -90,6 +101,7 @@ h1
   margin-right:1.5em;
   overflow:hidden;
   height:100px;
+  z-index:0;
 }
 #nextPhotos
 {
@@ -101,8 +113,6 @@ h1
 }
 #waiting
 {
-  position:relative;
-  top:-5em;
   z-index:1;
   display:none;
   text-align:center;

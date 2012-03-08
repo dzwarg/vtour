@@ -432,3 +432,25 @@ function closeHelp( event )
   var helpDiv = document.getElementById('help');
   helpDiv.style.display = 'none';
 }
+
+//
+//
+// Show and hide tooltip window.
+//
+//
+function showTooltip(event,text,align)
+{
+  var tooltip = document.getElementById('tooltip');
+
+  tooltip.innerHTML = text;
+  tooltip.style.display = 'block';
+  
+  tooltip.style.left = event.clientX + "px";
+  tooltip.style.top = event.clientY + "px";
+}
+
+function hideTooltip()
+{
+  var tooltip = document.getElementById('tooltip');
+  tooltip.style.display = 'none';
+}
