@@ -155,6 +155,7 @@
         sortInfo: { field: 'name', direction: 'ASC' },
         listeners: {
           select: function(combo,record,index) {
+            // this loop clears all geometries from tours -- but not tour settings.
             while (vtour.results.getComponent(1) != null) {
               vtour.results.remove( vtour.results.getComponent(1) );
             }
@@ -278,6 +279,9 @@
                 Ext.get('welcomePanel').update( welcomeTemplate.apply( [action.result.user.login] ) );
 
                 tourCombo.setValue( 'Loading...' );
+
+                // show the tour mgmt panel if a tour exists.
+                firstPanelSwitch( vtour.results.items.get(0), vtour.results.items.getCount()>1 );
 
                 // get all tours owned by this user
                 OpenLayers.Request.issue({
@@ -472,6 +476,9 @@
                         
           loggedInPanel.hide();
           loginPanel.show();
+
+          // clear any tours that are in the lightbox
+          firstPanelSwitch( vtour.results.items.get(0), false );
         }
       });
 
@@ -654,8 +661,26 @@
         };
       };
 
-      var delSearchHandler = function(resp) {
-        alert( resp.responseText );
+      var clrTourHandler = function(frm){
+        return function( btn, evt ) {
+          // this loop clears all geometries from tours -- but not tour settings.
+          while (vtour.results.getComponent(1) != null) {
+            vtour.results.remove( vtour.results.getComponent(1) );
+          }
+
+          // update the name of the tour in the mgmt panel
+          var fld = frm.findField('tourName');
+          var vDator = fld.validator;
+          fld.validator = function(v){ return true; };
+          fld.setValue( 'Untitled 1' );
+          fld.validator = vDator;
+
+          // update the creation date in the mgmt panel
+          Ext.get('tourMgmtCreateTime').update('Unsaved');
+
+          // reset the tour combo, just in case
+          tourCombo.reset();
+        };
       };
 
       var delTourHandler = function(frm) {
@@ -767,9 +792,9 @@
                 items: [
                   {
                     contentEl: 'saveBtnPanel'
-                  }, /*{
-                    contentEl: 'copyBtnPanel'
-                  },*/ {
+                  }, {
+                    contentEl: 'clrBtnPanel'
+                  }, {
                     contentEl: 'delBtnPanel'
                   }
                 ],
@@ -792,6 +817,9 @@
 
                     var save = Ext.get('saveBtnPanel');
                     save.on('click', saveTourHandler( tourMgmtPanel.getForm() ) );
+
+                    var clr = Ext.get('clrBtnPanel');
+                    clr.on('click', clrTourHandler( tourMgmtPanel.getForm() ) );
 
                     var del = Ext.get('delBtnPanel');
                     del.on('click', delTourHandler( tourMgmtPanel.getForm() ) );
@@ -1723,7 +1751,7 @@
     </ul>
   </div>
   <div id="saveBtnPanel"><img src="gtk-save.png"/><br/>Save</div>
-  <!-- <div id="copyBtnPanel"><img src="gtk-copy.png"/><br/>Copy</div> -->
+  <div id="clrBtnPanel"><img src="gnome-stock-import.png"/><br/>Clear</div>
   <div id="delBtnPanel"><img src="gtk-clear.png"/><br/>Delete</div>
   <div id="south">
     <p>Click on the map to search for photos.</p>
