@@ -180,4 +180,6 @@ div#close {
   border:solid 1px #cccccc;
   background:#ffffbb;
   opacity:0.8;
+  font-size:80%;
+  padding:3px;
 }

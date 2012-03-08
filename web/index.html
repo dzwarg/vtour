@@ -40,24 +40,27 @@
 
     <p>To start, search for the place you are interested in. The search box
     is in the upper right hand corner.  Go ahead and find your place now.
-    I'll wait.</p>
+    I'll wait. <img src="view.png" class="view" 
+    onclick="showHelp('search');"/></p>
 
-    <div class="centered">
+    <div class="centered dynhelp" id="help_search">
       <img src="search2.gif" alt="Search for 'new york, ny'"/>
     </div>
 
     <p>By the way, if at any point, you want to start again from scratch,
-    click on the "Start Over" button at the top.</p>
+    click on the "Start Over" button at the top. <img src="view.png" 
+    class="view" onclick="showHelp('restart');"/></p>
 
-    <div class="centered">
+    <div class="centered dynhelp" id="help_restart">
       <img src="startover.jpg" alt="Start Over button"/>
     </div>
 
     <p>Now that you've found a place to investigate, start clicking on the
     map.  Each click will place a marker, and search flickr for photographs
-    near the place you clicked.</p>
+    near the place you clicked. <img src="view.png" class="view"
+    onclick="showHelp('marker');"/></p>
 
-    <div class="centered">
+    <div class="centered dynhelp" id="help_marker">
       <img src="marker.jpg" alt="Marker"/>
     </div>
 
@@ -67,18 +70,26 @@
 
     <p>Below the strip of images, the number of total photos found near this
     point will be displayed.  Also, this will show you which set of images in
-    the search result you are viewing.</p>
+    the search result you are viewing. <img src="view.png" class="view"
+    onclick="showHelp('paging');"/></p>
 
-    <div class="centered">
+    <div class="centered dynhelp" id="help_paging">
       <img src="paging.jpg" alt="Viewing Image Set"/>
     </div>
 
     <p>To move forward or back in your "tour", click on the right or left
-    side of the light box, respectively.</p>
+    side of the light box, respectively. <img src="view.png" class="view"
+    onclick="showHelp('morepts');"/></p>
 
-    <hr/>
+    <div class="centered dynhelp" id="help_morepts">
+      <img src="previous.jpg" alt="Previous"/>
+      &nbsp;&nbsp;&nbsp;
+      <img src="next.jpg" alt="Next"/>
+    </div>
 
-    <p><a name="panoramio">* Support for 
+    <hr noshade="noshade" size="1"/>
+
+    <p class="foot"><a name="panoramio">* Support for 
     <a href="http://www.panoramio.com/">panoramio</a> is coming soon.</p>
   </div>
 </div>
@@ -86,14 +97,18 @@
 <div id="lightslide">
   <div id="prevPhotos" onmouseover="showTooltip(event,'Previous','R');"
        onmouseout="hideTooltip();">
-    <div class="slideButton" onclick="prevPoint();">&larr;</div>
+    <div class="slideButton" onclick="prevPoint();">
+      <img src="prev.png" alt="Previous"/>
+    </div>
   </div>
 
   <div id="photos"></div>
 
   <div id="nextPhotos" onmouseover="showTooltip(event,'Next','L');"
        onmouseout="hideTooltip();">
-    <div class="slideButton" onclick="nextPoint();">&rarr;</div>
+    <div class="slideButton" onclick="nextPoint();">
+      <img src="next.png" alt="Next"/>
+    </div>
   </div>
 </div>
 
