@@ -27,6 +27,95 @@
         data: []
       });
 
+      var fixDate = function(d) {
+        if ( d==null ) return null;
+        var m=d.match(/(\d+)-(\d+)-(\d+)/);
+        m=Date.parse(m[2] + '/' + m[3] + '/' + m[1]);
+        return new Date(m);
+      };
+      
+      var addSearchToDisplay = function(searches, detailFinish) {
+        var index = 0;
+        var addSearchToDisplay2 = function(comp){
+          if ( index < searches.length ) {
+            if ( comp ) {
+              var dom = comp.getEl().dom;
+              var imgs = Ext.DomQuery.select( 'img', dom );
+              var paging = Ext.DomQuery.select( 'div.x-paging-info', dom );
+
+              if ( paging.length == 0 ) {
+                setTimeout( function(){ addSearchToDisplay2(comp); }, 100 );
+                return;
+              }
+
+              if( imgs.length == 0 && !paging[0].innerHTML.match( /No images.*/ ) ) {
+                setTimeout( function(){ addSearchToDisplay2(comp); }, 100 );
+                return;
+              }
+            }
+
+            var prjBounds = vtour.projectBounds( searches[index].geometry.getBounds(), true );
+            var constraints = {
+              perPage: Math.floor(vtour.results.activeTab.el.getWidth()/93),
+              fromdate: fixDate(searches[index].attributes[ 'fromdate' ]),
+              todate: fixDate(searches[index].attributes[ 'todate' ]),
+              tags: searches[index].attributes[ 'tags' ]
+            };
+            
+            index++;
+            vtour.getFlickrPhotos( prjBounds.toBBOX(), searches[index-1], constraints );
+          }
+          else {
+            vtour.results.un('render',addSearchToDisplay2,window);
+            
+            detailFinish(searches);
+          }
+        };
+
+        return addSearchToDisplay2;
+      };
+
+      var addResultToDisplay = function(searches){
+        var addResultToDisplay2 = function(idx){
+          if ( idx >= searches.length )
+            return;
+
+          new OpenLayers.Ajax.Request(vtour.fsurl + '/result?queryable=search' +
+            '&search='+searches[idx].fid+'&format=geojson', {
+            method: 'get',
+            requestHeaders: ['Accept','application/json'],
+            asynchronous: true,
+            onSuccess: function(xhr) {
+              var results = vtour.geojson.read( xhr.responseText, 'FeatureCollection' );
+
+              for ( var i = 0; i < results.length; i++ ) {
+                results[i].geometry.transformed = false;
+                var newGeom = results[i].geometry.transform(
+                  vtour.ol_map.projection, vtour.ol_map.displayProjection );
+                var detail = {
+                  tags: 'some tags',
+                  position: { lon: newGeom.x, lat: newGeom.y },
+                  image: (function(img){
+                    var i = new Image();
+                    i.src = img;
+                    return i;
+                  })(results[i].attributes['thumb_url']),
+                  title: results[i].attributes['name'],
+                  imageid: 'image id',
+                  owner: 'owner id'
+                };
+
+                var comp = vtour.results.getComponent(idx+1);
+                vtour.showDetail( detail, comp.el.id );
+              }
+
+              setTimeout( function(){ addResultToDisplay2(idx+1); }, 100 );
+            }
+          });
+        };
+        addResultToDisplay2(0);
+      }
+
       var tourCombo = new Ext.form.ComboBox({
         store: myTourStore,
         displayField: 'name',
@@ -65,40 +154,14 @@
                   }
                 }
 
-                var index = 0;
-                var addSearchToDisplay = function(comp){
-                  if ( index < searches.length ) {
-                    if ( comp ) {
-                      var dom = comp.getEl().dom;
-                      var imgs = Ext.DomQuery.select( 'img', dom );
-                      var paging = Ext.DomQuery.select( 'div.x-paging-info', dom );
+                var addSearch = addSearchToDisplay(searches, addResultToDisplay);
 
-                      if ( paging.length == 0 ) {
-                        setTimeout( function(){ addSearchToDisplay(comp); }, 100 );
-                        return;
-                      }
-
-                      if( imgs.length == 0 && !paging[0].innerHTML.match( /No images.*/ ) ) {
-                        setTimeout( function(){ addSearchToDisplay(comp); }, 100 );
-                        return;
-                      }
-                    }
-
-                    var prjBounds = vtour.projectBounds( searches[index].geometry.getBounds(), true );
-                    index++; 
-                    vtour.getFlickrPhotos( prjBounds.toBBOX(), searches[index-1] );
-                  }
-                  else {
-                    vtour.results.un('render',addSearchToDisplay,window);
-                  }
-                };
-
-                vtour.results.on('render',addSearchToDisplay,window);
+                vtour.results.on('render',addSearch,window);
 
                 // add this search feature to the map
                 vtour.ol_layers['features'].addFeatures(searches);
 
-                addSearchToDisplay( null );
+                addSearch( null );
               }
             });
           }
@@ -486,7 +549,7 @@
           var boxes = vtour.ol_layers['features'].features;
           for ( var i = 0; i < boxes.length; i++ ) {
             vtour.saveSearch( userId, tour[0].fid,
-              boxes[i].geometry,
+              boxes[i],
               saveResultHandler( userId, boxes[i].attributes ),
               function( resp ) {
                 Ext.MessageBox.alert( 'Oops', 'Could not save searches' );
@@ -700,7 +763,7 @@
 	    owner: target.getAttribute( 'ext:owner' )
           }
           
-          vtour.showDetail( detail );
+          vtour.showDetail( detail, vtour.results.activeTab.el.id );
         }
       }); 
       
@@ -750,15 +813,15 @@
       );
     });
     
-    vtour.getFlickrPhotos = function( bbox, boxFeature ) {
-      var frm = vtour.datePanel.getForm();
-
-      // TODO: take these out of this method, and put these settings into
-      // the search record
-      var fromDate = frm.findField( 'fromDate' ).getValue();
-      var toDate = frm.findField( 'toDate' ).getValue();
-      frm = vtour.tagPanel.getForm();
-      var tags = frm.findField( 'tagFilter' ).getValue();
+    vtour.getFlickrPhotos = function( bbox, boxFeature, constraints ) {
+      var toDate = constraints.todate || new Date();
+      var fromDate = constraints.fromdate || (function(){ 
+        var d = new Date(); 
+        d.setFullYear( d.getFullYear() - 1 );
+        return d;
+      })();
+      var tags = constraints.tags || '';
+      var ppg = constraints.perpage || 10;
 
       var store = new Ext.data.Store({
         proxy: vtour.pxy,
@@ -778,7 +841,7 @@
       store.load({ params:
         {
           page: 1,
-          per_page: 10      
+          per_page: ppg
         }
       });
       
@@ -807,7 +870,7 @@
         }),
 
         bbar: new Ext.FlickrPagingToolbar({
-	  pageSize: 10,
+	  pageSize: ppg,
 	  store: store,
 	  displayInfo: true,
 	  displayMsg: 'Displaying images {0} - {1} of {2}',
@@ -847,6 +910,9 @@
       }); // end ext.panel
       
       boxFeature.attributes.searchElem = oneSearchPanel.id;
+      boxFeature.attributes.fromdate = fromDate;
+      boxFeature.attributes.todate = toDate;
+      boxFeature.attributes.tags = tags;
 
       // show results
       vtour.results.add( oneSearchPanel ).show();      
@@ -1106,8 +1172,19 @@
       vtour.ol_layers['features'].addFeatures([polygonFeature]);
 
       var prjBounds = vtour.projectBounds( myBounds, true );
-        
-      vtour.getFlickrPhotos( prjBounds.toBBOX(), polygonFeature );
+
+      // get settings from the UI
+      var datefrm = vtour.datePanel.getForm();
+      var tagfrm = vtour.tagPanel.getForm();
+
+      var constraints = {
+        perpage: Math.floor(vtour.results.activeTab.el.getWidth()/93),
+        fromdate: datefrm.findField('fromDate').getValue(),
+        todate: datefrm.findField('toDate').getValue(),
+        tags: tagfrm.findField('tagFilter').getValue()
+      };
+      
+      vtour.getFlickrPhotos( prjBounds.toBBOX(), polygonFeature, constraints );
     };
 
     vtour.projectBounds = function( bounds, fwd ) {
@@ -1127,7 +1204,7 @@
       return new OpenLayers.Bounds( ptMin.x, ptMin.y, ptMax.x, ptMax.y );
     };
     
-    vtour.showDetail = function( detail ) {
+    vtour.showDetail = function( detail, comp ) {
       // put something on the map
       
       // reproject from 4326
@@ -1140,7 +1217,7 @@
       var feature = new OpenLayers.Feature.Vector(
         new OpenLayers.Geometry.Point(pt.x, pt.y),
         {
-          searchElem: vtour.results.activeTab.el.id,
+          searchElem: comp,
           searchDetail: detail
         }
       );
@@ -1177,12 +1254,14 @@
       });
     };
 
-    vtour.saveSearch = function( userId, tourId, geometry, success, failure ) {
-      // create a bounding box
-      var feat = new OpenLayers.Feature.Vector( geometry, {
-        user_id: userId,
-        tour: tourId
-      });
+    vtour.saveSearch = function( userId, tourId, feature, success, failure ) {
+      var feat = new OpenLayers.Feature.Vector( feature.geometry, {
+        'user_id': userId,
+        tour: tourId,
+        fromdate: feature.attributes['fromdate'],
+        todate: feature.attributes['todate'],
+        tags: feature.attributes['tags']
+      } );
 
       new OpenLayers.Ajax.Request(vtour.fsurl + '/search?format=geojson', {
         method: 'post',

@@ -142,9 +142,6 @@ div#close {
   padding:2px;
   height:16px;
 }
-div.photoStrip {
-  height:100px;
-}
 div.photoItem
 {
   float:left;
@@ -163,6 +160,7 @@ div.photoItem
   clear:both;
   height:0px;
   line-height:0px;
+  font-size:1pt;
 }
 #pager
 {
