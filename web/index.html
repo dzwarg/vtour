@@ -159,11 +159,13 @@
           }, [
             {name: 'name'},
             {name: 'adminCode1'},
+            {name: 'adminName1'},
+            {name: 'countryCode' },
+            {name: 'countryName' },
             {name: 'lng', type: 'float'},
             {name: 'lat', type: 'float'}
           ]),
           baseParams:{
-            formatted: 'true',
             maxRows: 10,
             lang: 'en',
             style: 'medium',
@@ -174,7 +176,23 @@
         loadingText: 'Searching...',
         queryParam: 'name',
         itemSelector: 'div.x-combo-list-item',
-        tpl:new Ext.XTemplate( '<tpl for="."><div class="x-combo-list-item">{name}, {adminCode1}</div></tpl>' ),
+        tpl:new Ext.XTemplate( 
+          '<tpl for=".">',
+          '<tpl if="this.isShort(countryCode)">',
+          '<div class="x-combo-list-item">{name}, {adminName1}</div>',
+          '</tpl>',
+          '<tpl if="!this.isShort(countryCode) && this.isMedium(adminName1)">',
+          '<div class="x-combo-list-item">{name}, {countryName}</div>',
+          '</tpl>',
+          '<tpl if="!this.isShort(countryCode) && !this.isMedium(adminName1)">',
+          '<div class="x-combo-list-item">{name}, {adminName1}, {countryName}</div>',
+          '</tpl>',
+          '</tpl>',
+          {
+            isShort: function( code ) { return code=='US'; },
+            isMedium: function( name ) { return name==null||name.length==0; }
+          }
+        ),
         mode:'remote',
         width: 165,
         listeners: {
