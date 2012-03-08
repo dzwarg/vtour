@@ -245,6 +245,8 @@ function getImageInfo()
   };
   xmlReq.open('GET',url,true);
   xmlReq.send(null);
+
+  return false;
 }
 
 function photoInfoResponse(rsp,url)
@@ -335,13 +337,15 @@ var tooltipTimeout;
 
 function showTooltip(event,text,align)
 {
+  var scrolling = getScrollXY();
   var x = event.clientX;
-  var y = event.clientY;
+  var y = event.clientY + scrolling[1];
 
   tooltipTimeout = setTimeout( function(){
     tooltip.innerHTML = text;
     tooltip.style.display = 'block';
- 
+    tooltip.style.visibility = 'hidden';
+
     if ( align == 'R' )
     { 
       tooltip.style.left = (x+5) + 'px';
@@ -352,8 +356,36 @@ function showTooltip(event,text,align)
     }
     tooltip.style.top = (y+5) + 'px';
 
+    tooltip.style.visibility = 'visible';
     clearTimeout( tooltipTimeout );
   }, 500 );
+}
+
+//
+// From http://www.howtocreate.co.uk/tutorials/javascript/browserwindow
+//
+function getScrollXY() 
+{ 
+  var scrOfX = 0, scrOfY = 0;
+  if( typeof( window.pageYOffset ) == 'number' ) 
+  {
+    //Netscape compliant
+    scrOfY = window.pageYOffset;
+    scrOfX = window.pageXOffset;
+  }
+  else if( document.body && ( document.body.scrollLeft || document.body.scrollTop ) ) 
+  {
+    //DOM compliant
+    scrOfY = document.body.scrollTop;
+    scrOfX = document.body.scrollLeft;
+  }
+  else if( document.documentElement && ( document.documentElement.scrollLeft || document.documentElement.scrollTop ) ) 
+  {
+    //IE6 standards compliant mode
+    scrOfY = document.documentElement.scrollTop;
+    scrOfX = document.documentElement.scrollLeft;
+  }
+  return [ scrOfX, scrOfY ];
 }
 
 function hideTooltip()

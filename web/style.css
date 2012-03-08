@@ -126,6 +126,7 @@ h1.pagetitle
   color:#000099;
   opacity:0.75;
   padding:0.25em;
+  border:solid 1px #cccccc;
 }
 div#close {
   float:right;
