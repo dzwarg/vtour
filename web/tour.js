@@ -149,8 +149,10 @@ TourPoint.prototype.computeBounds = function( map )
   return bounds;
 };
 
-TourPoint.prototype.fetchPhotos = function( map )
+TourPoint.prototype.fetchPhotos = function( map, waitingRef )
 {
+  waitingRef(true);
+
   var bbox = this.computeBounds( map );
 
   var url = 'http://www.zwarg.com/cgi-bin/pxy.cgi?';
@@ -168,9 +170,13 @@ TourPoint.prototype.fetchPhotos = function( map )
     {
       if ( xmlReq.status == 200 )
       {
+        //debugMessage( xmlReq.responseText );
+
         var rsp;
         eval( 'rsp = ' + xmlReq.responseText );
         caller.fetchPhotosCallback( caller, rsp );
+
+        waitingRef(false);
       }
     }
   };
@@ -226,6 +232,17 @@ TourPoint.prototype.fetchPhotosCallback = function( me, rsp )
   end.appendChild( document.createTextNode('\u00a0') );
 
   photoDiv.appendChild( end );
+
+  var moreInfo = document.createElement('div');
+  moreInfo.className = 'smallText';
+  var from = ((rsp.photos.page-1)*rsp.photos.perpage)+1;
+  var to = (rsp.photos.page-1)*rsp.photos.perpage+rsp.photos.perpage;
+  to = ( rsp.photos.total < to ) ? rsp.photos.total : to;
+  var moreInfoStr = 'Photos found: ' + rsp.photos.total + ' :: Showing photos ';
+  moreInfoStr += from.toString() + ' to ' + to.toString();
+  moreInfo.appendChild( document.createTextNode(moreInfoStr) );
+
+  photoDiv.appendChild( moreInfo );
 
   me.PhotoPanel = photoDiv;
 

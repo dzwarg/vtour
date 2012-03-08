@@ -8,11 +8,7 @@
 var map;
 
 // Create an array of tour pts
-var tourPts = new Array();
-var tourPolys = new Array();
-var tourMarkers = new Array();
-var resultMarkers = new Array();
-var tour = null;
+var tour = new Tour();
 var mapEvt = null;
 
 function setup()
@@ -52,63 +48,30 @@ function setup()
 
 // mouse click capture function
 function markPt(_e, _c){
-  // get the coordinate of this point
-  var geoPt = new YGeoPoint( _c.Lat, _c.Lon );
-  var marker = new YMarker( geoPt );
-  marker.addAutoExpand("Click to delete");
+  if ( tour.TourPolyline ) map.removeOverlay( tour.TourPolyline );
+  
+  tour.addPoint( _c.Lat, _c.Lon );
 
-  if ( tour ) map.removeOverlay( tour );
+  map.addOverlay( tour.getPolyline() );
 
-  tourPts.push( geoPt );
-  tour = new YPolyline( tourPts, 'black', 7, 0.7 );
+  var myPoint = tour.TourPoints[ tour.TourPoints.length - 1 ];
 
-  YEvent.Capture( marker, EventsList.MouseClick, 
+  YEvent.Capture( myPoint.Marker, EventsList.MouseClick, 
     function(){
-      map.removeOverlay(marker);
-      if ( tour ) map.removeOverlay(tour);
+      map.removeOverlay( myPoint.Marker );
+      if ( tour.TourPolyline ) map.removeOverlay( tour.TourPolyline );
 
-      // find out exactly which item to splice out
-      var ptIndex = -1;
-      for( var i = 0; i < tourPts.length; i++ )
-      {
-        if ( tourPts[i].Lat == marker.YGeoPoint.Lat &&
-             tourPts[i].Lon == marker.YGeoPoint.Lon )
-          ptIndex = i;
-      }
+      var index = tour.indexOfMarker( myPoint.Marker );
+ 
+      tour.removePoint( index );
 
-      // splice out the matching point, and only that point
-      tourPts.splice( ptIndex, 1 );
-      tourPolys.splice( ptIndex, 1 );
-      tourMarkers.splice( ptIndex, 1 );
-      tour = new YPolyline( tourPts, 'black', 7, 0.7 );
-      map.addOverlay( tour );
+      map.addOverlay( tour.getPolyline() );
     }
   );
 
-  map.addOverlay(marker);
-  tourMarkers.push( marker );
+  map.addOverlay( myPoint.Marker );
 
-  if ( tourPts.length > 1 )
-  {
-    map.addOverlay( tour );
-  }
-
-  var coord = map.convertLatLonXY( marker.YGeoPoint );
-  var coord1 = new YCoordPoint( coord.x + 25, coord.y - 25 );
-  var coord2 = new YCoordPoint( coord.x + 25, coord.y + 25 );
-  var coord3 = new YCoordPoint( coord.x - 25, coord.y + 25 );
-  var coord4 = new YCoordPoint( coord.x - 25, coord.y - 25 );
-
-  var polyBounds = [
-    map.convertXYLatLon( coord1 ),
-    map.convertXYLatLon( coord2 ),
-    map.convertXYLatLon( coord3 ),
-    map.convertXYLatLon( coord4 ),
-    map.convertXYLatLon( coord1 ) ];
-
-  tourPolys.push( new YPolyline( polyBounds, 'green', 1, 1 ) );
-  //map.addOverlay( tourPolys[ tourPolys.length - 1 ] );
-  //debugMessage( 'Ft per pixel:' + (map.getUnitsPerPixel( map.getZoomLevel() ).miles * 5280) + '<br/>' );
+  myPoint.fetchPhotos( map );
 }
 
 function enumerateProperties ( obj )
@@ -125,23 +88,20 @@ function enumerateProperties ( obj )
 
 var flickrkey='d9a76ca10b3a34cf59a859843d495b63';
 var tourleg = 0;
+var resultMarkers = new Array();
 
 function clearTour()
 {
   clearTourPhotos();
 
-  while ( tourMarkers.length > 0 )
+  map.removeOverlay( tour.TourPolyline );
+
+  while ( tour.TourPoints.length > 0 )
   {
-    var marker = tourMarkers.pop();
-    map.removeOverlay( marker );
+    var tourPt = tour.TourPoints.pop();
+    map.removeOverlay( tourPt.Marker );
   }
 
-  map.removeOverlay( tour );
-
-  tour = null;
-  tourPts = new Array();
-  tourPolys = new Array();
-  tourMarkers = new Array();
   resultMarkers = new Array();
 }
 
@@ -174,21 +134,21 @@ function getTourPhotos()
 {
   waiting(true);
 
-  if ( tourPolys.length == 0 )
+  if ( tour.TourPoints.length == 0 )
   {
     window.alert( 'add a point first!' );
     waiting(false);
     return;
   }
 
-  if ( tourleg + 1 > tourPolys.length )
+  if ( tourleg + 1 > tour.TourPoints.length )
   {
     // end of the tour!
     waiting(false);
     return;
   }
 
-  var bbox = BoundsFromPoly( tourPolys[tourleg++] );
+  var bbox = tour.TourPoints[ tourleg++ ].computeBounds(map);
   //debugMessage( bbox );
 
   var url = 'http://www.zwarg.com/cgi-bin/pxy.cgi?';
@@ -215,16 +175,6 @@ function getTourPhotos()
   };
   xmlReq.open('GET',url,true);
   xmlReq.send(null);
-}
-
-function BoundsFromPoly( polyline )
-{
-  var minx = polyline._path[2].Lon;
-  var miny = polyline._path[2].Lat;
-  var maxx = polyline._path[0].Lon;
-  var maxy = polyline._path[0].Lat;
-
-  return minx+','+miny+','+maxx+','+maxy;
 }
 
 function geoSearchResponse(rsp)

@@ -93,7 +93,6 @@ h1
 {
   display:none;
   text-align:center;
-  margin-top:2em;
 }
 .photoItem
 {
@@ -111,8 +110,8 @@ h1
 .topFloat, .bottomFloat
 {
   clear:both;
-  height:12.5px;
-  line-height:12.5px;
+  height:0px;
+  line-height:0px;
 }
 #pager
 {

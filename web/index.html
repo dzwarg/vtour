@@ -14,7 +14,7 @@
 </div>
 
 <div class="search">
-  <input type="text" name="place" id="place" />
+  <input type="text" name="place" id="place" onkeypress="placeInputEvent(event);" />
   <input type="button" value="Find" onclick="findPlace();" />
 </div>
 
@@ -23,7 +23,7 @@
 </div>
 
 <div class="actionpanel">
-  <input class="actionbutton" type="button" value="What Will I See?" onclick="clearTourPhotos();getTourPhotos();"/>
+  <!--<input class="actionbutton" type="button" value="What Will I See?" onclick="clearTourPhotos();getTourPhotos();"/>-->
   <input class="actionbutton" type="button" value="Start Over" onclick="clearTour();"/>
 </div>
 
@@ -37,11 +37,12 @@
   <div id="nextPhotos">
     <div class="slideButton" onclick="nextPoint();">&rarr;</div>
   </div>
-  <div id="waiting"><div><img src="progress.gif"/></div></div>
+
 </div>
 
 <div id="pager">
   <span id="pagerNow">0</span> / <span id="pagerTotal">0</span>
+  <span id="waiting"><img src="progress.gif"/></span>
 </div>
 
 <div id="debug">
