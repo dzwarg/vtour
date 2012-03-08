@@ -13,6 +13,11 @@
   <h1>Oh, The Places You Will Go</h1>
 </div>
 
+<div class="actionpanel">
+  <!--<input class="actionbutton" type="button" value="What Will I See?" onclick="clearTourPhotos();getTourPhotos();"/>-->
+  <input class="actionbutton" type="button" value="Start Over" onclick="clearTour();"/>
+</div>
+
 <div class="search">
   <input type="text" name="place" id="place" onkeypress="placeInputEvent(event);" class="gradient"/>
   <input type="button" value="Find" onclick="findPlace();" />
@@ -37,12 +42,10 @@
 
 <div id="pager">
   <span id="pagerNow">0</span> / <span id="pagerTotal">0</span>
-  <span id="waiting"><img src="progress.gif"/></span>
 </div>
 
-<div class="actionpanel">
-  <!--<input class="actionbutton" type="button" value="What Will I See?" onclick="clearTourPhotos();getTourPhotos();"/>-->
-  <input class="actionbutton" type="button" value="Start Over" onclick="clearTour();"/>
+<div id="waiting">
+  <img src="progress.gif"/>
 </div>
 
 <div id="debug">

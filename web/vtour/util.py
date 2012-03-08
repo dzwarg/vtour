@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import sys
+import sys,os
 import simplejson
 
 import hashlib
@@ -15,3 +15,12 @@ def error( message ):
 def encrypt( original ):
 	hsh = hashlib.md5( original )
 	return hsh.hexdigest()
+
+def autolink():
+	return "http://" + os.environ["HTTP_HOST"] + "/" + os.environ["SCRIPT_NAME"].split(".")[0]
+
+def authsecret():
+	if ( os.environ.has_key("HTTP_VTAUTH") ):
+		return os.environ["HTTP_VTAUTH"]
+	else:
+		return ""

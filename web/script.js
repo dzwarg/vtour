@@ -66,6 +66,7 @@ function markPt(_e, _c){
 
       var index = tour.indexOfMarker( myPoint.Marker );
  
+      alert( 'removing '+index );
       tour.removePoint( index );
 
       map.addOverlay( tour.getPolyline() );
@@ -89,7 +90,7 @@ function enumerateProperties ( obj )
 //
 //
 
-var flickrkey='d9a76ca10b3a34cf59a859843d495b63';
+var flickrkey='flickrkey';
 var tourleg = 0;
 var resultMarkers = new Array();
 

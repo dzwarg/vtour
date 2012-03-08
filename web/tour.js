@@ -172,6 +172,11 @@ TourPoint.prototype.fetchPhotos = function( map, waitingRef )
     '&nojsoncallback=1';
   this.SearchUrl = url + escape( params );
 
+  this.SendFetchRequest( this.SearchUrl, waitingRef );
+};
+
+TourPoint.prototype.SendFetchRequest = function ( url, waitingRef )
+{
   var xmlReq = getXmlRequest();
 
   var caller = this;
@@ -181,26 +186,36 @@ TourPoint.prototype.fetchPhotos = function( map, waitingRef )
     {
       if ( xmlReq.status == 200 )
       {
-        //debugMessage( xmlReq.responseText );
-
         var rsp;
         eval( 'rsp = ' + xmlReq.responseText );
-        caller.fetchPhotosCallback( caller, rsp );
+        caller.fetchPhotosCallback( rsp );
 
         waitingRef(false);
       }
     }
   };
-  xmlReq.open('GET',this.SearchUrl,true);
+  xmlReq.open('GET',url,true);
   xmlReq.send(null);
 };
 
-TourPoint.prototype.fetchPhotosCallback = function( me, rsp )
+TourPoint.prototype.fetchPhotosCallback = function( rsp )
 {
   var photosDiv = document.getElementById('photos');
 
-  var photoDiv = document.createElement('div');
-  photoDiv.id = 'photos' + this.Marker.id;
+  var photoDiv = document.getElementById('photos'+this.Marker.id);
+
+  if ( photoDiv == null )
+  {
+    photoDiv = document.createElement('div');
+    photoDiv.id = 'photos' + this.Marker.id;
+  }
+  else
+  {
+    while ( photoDiv.childNodes.length > 0 )
+    {
+      photoDiv.removeChild( photoDiv.firstChild );
+    }
+  }
 
   var begin = document.createElement('div');
   begin.className='topFloat';
@@ -244,17 +259,17 @@ TourPoint.prototype.fetchPhotosCallback = function( me, rsp )
 
   photoDiv.appendChild( end );
 
-  photoDiv.appendChild( me.CreateMoreInfoString( rsp ) );
+  photoDiv.appendChild( this.MorePhotoInfo( rsp ) );
 
-  me.PhotoPanel = photoDiv;
+  this.PhotoPanel = photoDiv;
 
   photosDiv.appendChild( photoDiv );
 
-  me.ShowLastPhotoPanel( photosDiv );
-  me.UpdatePhotoPaging( photosDiv );
+  this.ShowLastPhotoPanel( photosDiv );
+  this.UpdatePhotoPaging( photosDiv );
 };
 
-TourPoint.prototype.CreateMoreInfoString = function( rsp )
+TourPoint.prototype.MorePhotoInfo = function( rsp )
 {
   var from = ((rsp.photos.page-1)*rsp.photos.perpage)+1;
   var to = (rsp.photos.page-1)*rsp.photos.perpage+rsp.photos.perpage;
@@ -267,7 +282,7 @@ TourPoint.prototype.CreateMoreInfoString = function( rsp )
   {
     var prev = document.createElement('span');
     prev.className = 'resultButton';
-    prev.onclick = function(){ alert('previous photos,please'); };
+    prev.onclick = this.MorePhotosFunction('prev');
     prev.appendChild( document.createTextNode('\u00ab') );
     info.appendChild( prev );
   }
@@ -279,12 +294,28 @@ TourPoint.prototype.CreateMoreInfoString = function( rsp )
   {
     var next = document.createElement('span');
     next.className = 'resultButton';
-    next.onclick = function(){ alert('next photos,please'); };
+    next.onclick = this.MorePhotosFunction('next');
     next.appendChild( document.createTextNode('\u00bb') );
     info.appendChild( next );
   }
 
   return info;
+};
+
+TourPoint.prototype.MorePhotosFunction = function(dir)
+{
+  var caller = this;
+  return function(){
+    if(dir == 'next')
+    { caller.ResultsPage++; }
+    else
+    { caller.ResultsPage--; }
+
+    //&page=1
+    var newUrl = caller.SearchUrl.replace( /\%26page\%3D\d+/, '%26page%3D' + caller.ResultsPage);
+    
+    caller.SendFetchRequest( caller.SearchUrl, waiting );
+  };
 };
 
 TourPoint.prototype.ShowLastPhotoPanel = function( div )

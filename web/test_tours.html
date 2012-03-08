@@ -1,9 +1,13 @@
 <html>
 <head>
-  <script src="OpenLayers/OpenLayers.js"></script>
+  <script src="OpenLayers-2.6/lib/OpenLayers.js"></script>
   <script type="text/javascript">
-		var fshref = "http://localhost/~davidz/featureserver-1.12/featureserver.cgi/tour"
-		var basehref = "http://localhost/~davidz/users"
+		var fshref = "http://www.spondubone.net/fs/featureserver.cgi/tour"
+		var basehref = "http://www.spondubone.net/~davidz/users"
+		OpenLayers.Ajax.Responders.register( { onCreate:function(req,resp) {
+			if ( req.method == 'post' && req.options.method == 'delete' )
+				req.method = 'delete';
+		}});
 		function makerequest( method, pathinfo, parameters, data, reqHeaders ) {
 				var obj = null;
 

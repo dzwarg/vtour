@@ -1,8 +1,13 @@
 <html>
 <head>
-  <script src="OpenLayers/OpenLayers.js"></script>
+  <script src="OpenLayers-2.6/lib/OpenLayers.js"></script>
   <script type="text/javascript">
-		var basehref = "http://localhost/~davidz/users"
+		var basehref = "http://www.spondubone.net/~davidz/users"
+		OpenLayers.Ajax.Responders.register( { onCreate:function(req,resp) {
+			if ( req.method == 'post' && req.options.method == 'delete' )
+				req.method = 'delete';
+		}});
+
 		function makerequest( method, pathinfo, parameters, data, reqHeaders ) {
 				var obj = null;
 
@@ -48,7 +53,7 @@
     function test_03_users_login_nopass(t) {
         t.plan(3)
         
-        var tc = makerequest( "get", "/login", "user=testuser", "" )
+        var tc = makerequest( "get", "/login", {user:"testuser"}, "" )
 
         t.ok( tc != null, "got a json object back")
         t.ok( tc.message != null, "response json message is not null" )
@@ -58,7 +63,7 @@
 		function test_04_users_delete_full(t) {
 				t.plan(3)
 
-				var tc = makerequest( "get", "/login", "user=testuser&password=secret", "" )
+				var tc = makerequest( "get", "/login", {user:"testuser",password:"secret"}, "" )
 
 				var id = tc.user.id
 				var secret = tc.secret
@@ -73,7 +78,7 @@
 		function test_05_users_delete_invalid(t) {
 				t.plan(3)
 
-				var tc = makerequest( "get", "/login", "user=testuser&password=secret", "" )
+				var tc = makerequest( "get", "/login", {user:"testuser",password:"secret"}, "" )
 
 				var id = tc.user.id
 
@@ -87,7 +92,7 @@
 		function test_06_users_delete(t) {
 				t.plan(3)
 
-				var tc = makerequest( "get", "/login", "user=testuser&password=secret", "" )
+				var tc = makerequest( "get", "/login", {user:"testuser",password:"secret"}, "" )
 
 				var id = tc.user.id
 
@@ -101,7 +106,7 @@
 		function test_07_users_post(t) {
 				t.plan(3)
 
-				var tc = makerequest( "get", "/login", "user=testuser&password=secret", "" )
+				var tc = makerequest( "get", "/login", {user:"testuser",password:"secret"}, "" )
 
 				var id = tc.user.id
 
@@ -115,7 +120,7 @@
 		function test_08_users_post(t) {
 				t.plan(3)
 
-				var tc = makerequest( "get", "/login", "user=testuser&password=secret", "" )
+				var tc = makerequest( "get", "/login", {user:"testuser",password:"secret"}, "" )
 
 				var id = tc.user.id
 
@@ -129,7 +134,7 @@
 		function test_09_users_post(t) {
 				t.plan(3)
 
-				var tc = makerequest( "get", "/login", "user=testuser&password=secret", "" )
+				var tc = makerequest( "get", "/login", {user:"testuser",password:"secret"}, "" )
 
 				var id = tc.user.id
 
@@ -143,7 +148,7 @@
 		function test_10_users_post(t) {
 				t.plan(3)
 
-				var tc = makerequest( "get", "/login", "user=testuser&password=secret", "" )
+				var tc = makerequest( "get", "/login", {user:"testuser",password:"secret"}, "" )
 
 				var id = tc.user.id
 
@@ -157,7 +162,7 @@
 		function test_11_users_post_badsecret(t) {
 				t.plan(3)
 
-				var tc = makerequest( "get", "/login", "user=testuser&password=secret", "" )
+				var tc = makerequest( "get", "/login", {user:"testuser",password:"secret"}, "" )
 
 				var id = tc.user.id
 
@@ -171,7 +176,7 @@
 		function test_12_users_post_full(t) {
 				t.plan(3)
 
-				var tc = makerequest( "get", "/login", "user=testuser&password=secret", "" )
+				var tc = makerequest( "get", "/login", {user:"testuser",password:"secret"}, "" )
 
 				var id = tc.user.id
 				var secret = tc.secret
@@ -186,7 +191,7 @@
     function test_13_users_login_full(t) {
         t.plan(4)
         
-        var tc = makerequest( "get", "/login", "user=testuser&password=secret", "" )
+        var tc = makerequest( "get", "/login", {user:"testuser",password:"secret"}, "" )
 
         t.ok( tc != null, "got a json object back")
         t.ok( tc.message != null, "response json message is not null" )
@@ -197,7 +202,7 @@
     function test_14_users_login_invalid(t) {
         t.plan(3)
         
-        var tc = makerequest( "get", "/login", "user=testuser&password=compromised", "" )
+        var tc = makerequest( "get", "/login", {user:"testuser",password:"compromised"}, "" )
 
         t.ok( tc != null, "got a json object back")
         t.ok( tc.message != null, "response json message is not null" )
@@ -237,7 +242,7 @@
 		function test_18_users_post_wrongverb(t) {
 				t.plan(3)
 
-				var tc = makerequest( "get", "/register", "user=testuser&password=secret&email=davidz-test@spondubone.net" )
+				var tc = makerequest( "get", "/register", {user:"testuser",password:"secret",email:"davidz-test@spondubone.net"} )
 
 				t.ok( tc != null, "got a json object back" )
 				t.ok( tc.message != null, "response json message is not null" )

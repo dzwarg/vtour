@@ -2,14 +2,14 @@
 -- PostgreSQL database dump
 --
 
--- Started on 2008-05-19 23:25:48 EDT
+-- Started on 2008-06-02 23:37:20 EDT
 
 SET client_encoding = 'UTF8';
 SET check_function_bodies = false;
 SET client_min_messages = warning;
 
 --
--- TOC entry 2304 (class 1262 OID 21266)
+-- TOC entry 2307 (class 1262 OID 21266)
 -- Name: vtour; Type: DATABASE; Schema: -; Owner: vtourUser
 --
 
@@ -25,7 +25,7 @@ SET check_function_bodies = false;
 SET client_min_messages = warning;
 
 --
--- TOC entry 2305 (class 0 OID 0)
+-- TOC entry 2308 (class 0 OID 0)
 -- Dependencies: 4
 -- Name: SCHEMA public; Type: COMMENT; Schema: -; Owner: postgres
 --
@@ -10934,7 +10934,7 @@ CREATE TABLE results (
     thumb_url character varying(1024) NOT NULL,
     page_url character varying(1024) NOT NULL,
     name character varying(255) NOT NULL,
-    "user" integer NOT NULL,
+    user_id integer NOT NULL,
     search integer NOT NULL,
     geom geometry,
     CONSTRAINT enforce_dims_geom CHECK ((ndims(geom) = 2)),
@@ -10953,7 +10953,7 @@ ALTER TABLE public.results OWNER TO "vtourUser";
 
 CREATE TABLE searches (
     id serial NOT NULL,
-    "user" integer NOT NULL,
+    user_id integer NOT NULL,
     geom geometry,
     tour integer NOT NULL,
     CONSTRAINT enforce_dims_geom CHECK ((ndims(geom) = 2)),
@@ -10972,7 +10972,7 @@ ALTER TABLE public.searches OWNER TO "vtourUser";
 
 CREATE TABLE settings (
     id serial NOT NULL,
-    "user" integer NOT NULL,
+    user_id integer NOT NULL,
     name character varying(1024) NOT NULL,
     value character varying(1024)
 );
@@ -11003,16 +11003,20 @@ SET default_with_oids = true;
 
 --
 -- TOC entry 1930 (class 1259 OID 22113)
--- Dependencies: 2276 4
+-- Dependencies: 2276 2277 2278 2279 4 919
 -- Name: tours; Type: TABLE; Schema: public; Owner: vtourUser; Tablespace: 
 --
 
 CREATE TABLE tours (
     id serial NOT NULL,
-    "user" integer NOT NULL,
+    user_id integer NOT NULL,
     name character varying(1024) NOT NULL,
-    date date NOT NULL,
-    public boolean DEFAULT false NOT NULL
+    date character varying NOT NULL,
+    public boolean DEFAULT false NOT NULL,
+    geom geometry,
+    CONSTRAINT enforce_dims_geom CHECK ((ndims(geom) = 2)),
+    CONSTRAINT enforce_geotype_geom CHECK (((geometrytype(geom) = 'LINESTRING'::text) OR (geom IS NULL))),
+    CONSTRAINT enforce_srid_geom CHECK ((srid(geom) = 4326))
 );
 
 
@@ -11026,8 +11030,8 @@ ALTER TABLE public.tours OWNER TO "vtourUser";
 
 CREATE TABLE users (
     id serial NOT NULL,
-    "login" character varying(255) NOT NULL,
-    "password" character varying(255) NOT NULL,
+    login_name character varying(255) NOT NULL,
+    passcode character varying(255) NOT NULL,
     email character varying(255) NOT NULL
 );
 
@@ -11035,7 +11039,7 @@ CREATE TABLE users (
 ALTER TABLE public.users OWNER TO "vtourUser";
 
 --
--- TOC entry 2280 (class 2606 OID 21643)
+-- TOC entry 2283 (class 2606 OID 21643)
 -- Dependencies: 1920 1920 1920 1920 1920
 -- Name: geometry_columns_pk; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
 --
@@ -11045,7 +11049,7 @@ ALTER TABLE ONLY geometry_columns
 
 
 --
--- TOC entry 2292 (class 2606 OID 22089)
+-- TOC entry 2295 (class 2606 OID 22089)
 -- Dependencies: 1928 1928
 -- Name: results_pk; Type: CONSTRAINT; Schema: public; Owner: vtourUser; Tablespace: 
 --
@@ -11055,7 +11059,7 @@ ALTER TABLE ONLY results
 
 
 --
--- TOC entry 2290 (class 2606 OID 22065)
+-- TOC entry 2293 (class 2606 OID 22065)
 -- Dependencies: 1926 1926
 -- Name: searches_pk; Type: CONSTRAINT; Schema: public; Owner: vtourUser; Tablespace: 
 --
@@ -11065,7 +11069,7 @@ ALTER TABLE ONLY searches
 
 
 --
--- TOC entry 2286 (class 2606 OID 22050)
+-- TOC entry 2289 (class 2606 OID 22050)
 -- Dependencies: 1924 1924
 -- Name: settings_pk; Type: CONSTRAINT; Schema: public; Owner: vtourUser; Tablespace: 
 --
@@ -11075,17 +11079,17 @@ ALTER TABLE ONLY settings
 
 
 --
--- TOC entry 2288 (class 2606 OID 22052)
+-- TOC entry 2291 (class 2606 OID 22052)
 -- Dependencies: 1924 1924 1924
 -- Name: settings_user_uniq; Type: CONSTRAINT; Schema: public; Owner: vtourUser; Tablespace: 
 --
 
 ALTER TABLE ONLY settings
-    ADD CONSTRAINT settings_user_uniq UNIQUE ("user", name);
+    ADD CONSTRAINT settings_user_uniq UNIQUE (user_id, name);
 
 
 --
--- TOC entry 2278 (class 2606 OID 21636)
+-- TOC entry 2281 (class 2606 OID 21636)
 -- Dependencies: 1919 1919
 -- Name: spatial_ref_sys_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
 --
@@ -11095,17 +11099,17 @@ ALTER TABLE ONLY spatial_ref_sys
 
 
 --
--- TOC entry 2294 (class 2606 OID 22123)
+-- TOC entry 2297 (class 2606 OID 22123)
 -- Dependencies: 1930 1930 1930
 -- Name: tour_user_name_uniq; Type: CONSTRAINT; Schema: public; Owner: vtourUser; Tablespace: 
 --
 
 ALTER TABLE ONLY tours
-    ADD CONSTRAINT tour_user_name_uniq UNIQUE ("user", name);
+    ADD CONSTRAINT tour_user_name_uniq UNIQUE (user_id, name);
 
 
 --
--- TOC entry 2296 (class 2606 OID 22121)
+-- TOC entry 2299 (class 2606 OID 22121)
 -- Dependencies: 1930 1930
 -- Name: tours_pk; Type: CONSTRAINT; Schema: public; Owner: vtourUser; Tablespace: 
 --
@@ -11115,17 +11119,17 @@ ALTER TABLE ONLY tours
 
 
 --
--- TOC entry 2282 (class 2606 OID 22040)
+-- TOC entry 2285 (class 2606 OID 22040)
 -- Dependencies: 1922 1922
 -- Name: users_login_uniq; Type: CONSTRAINT; Schema: public; Owner: vtourUser; Tablespace: 
 --
 
 ALTER TABLE ONLY users
-    ADD CONSTRAINT users_login_uniq UNIQUE ("login");
+    ADD CONSTRAINT users_login_uniq UNIQUE (login_name);
 
 
 --
--- TOC entry 2284 (class 2606 OID 22038)
+-- TOC entry 2287 (class 2606 OID 22038)
 -- Dependencies: 1922 1922
 -- Name: users_pk; Type: CONSTRAINT; Schema: public; Owner: vtourUser; Tablespace: 
 --
@@ -11135,8 +11139,8 @@ ALTER TABLE ONLY users
 
 
 --
--- TOC entry 2300 (class 2606 OID 22090)
--- Dependencies: 1928 1926 2289
+-- TOC entry 2303 (class 2606 OID 22090)
+-- Dependencies: 1928 1926 2292
 -- Name: results_searches_fk; Type: FK CONSTRAINT; Schema: public; Owner: vtourUser
 --
 
@@ -11145,18 +11149,18 @@ ALTER TABLE ONLY results
 
 
 --
--- TOC entry 2301 (class 2606 OID 22095)
--- Dependencies: 1928 1922 2283
+-- TOC entry 2304 (class 2606 OID 22095)
+-- Dependencies: 1928 1922 2286
 -- Name: results_users_fk; Type: FK CONSTRAINT; Schema: public; Owner: vtourUser
 --
 
 ALTER TABLE ONLY results
-    ADD CONSTRAINT results_users_fk FOREIGN KEY ("user") REFERENCES users(id);
+    ADD CONSTRAINT results_users_fk FOREIGN KEY (user_id) REFERENCES users(id);
 
 
 --
--- TOC entry 2299 (class 2606 OID 22129)
--- Dependencies: 1926 1930 2295
+-- TOC entry 2302 (class 2606 OID 22129)
+-- Dependencies: 1926 1930 2298
 -- Name: search_tour_fk; Type: FK CONSTRAINT; Schema: public; Owner: vtourUser
 --
 
@@ -11165,37 +11169,37 @@ ALTER TABLE ONLY searches
 
 
 --
--- TOC entry 2298 (class 2606 OID 22068)
--- Dependencies: 1926 1922 2283
+-- TOC entry 2301 (class 2606 OID 22068)
+-- Dependencies: 1926 1922 2286
 -- Name: searches_users_fk; Type: FK CONSTRAINT; Schema: public; Owner: vtourUser
 --
 
 ALTER TABLE ONLY searches
-    ADD CONSTRAINT searches_users_fk FOREIGN KEY ("user") REFERENCES users(id);
+    ADD CONSTRAINT searches_users_fk FOREIGN KEY (user_id) REFERENCES users(id);
 
 
 --
--- TOC entry 2297 (class 2606 OID 22053)
--- Dependencies: 1924 1922 2283
+-- TOC entry 2300 (class 2606 OID 22053)
+-- Dependencies: 1924 1922 2286
 -- Name: settings_users_fk; Type: FK CONSTRAINT; Schema: public; Owner: vtourUser
 --
 
 ALTER TABLE ONLY settings
-    ADD CONSTRAINT settings_users_fk FOREIGN KEY ("user") REFERENCES users(id);
+    ADD CONSTRAINT settings_users_fk FOREIGN KEY (user_id) REFERENCES users(id);
 
 
 --
--- TOC entry 2302 (class 2606 OID 22124)
--- Dependencies: 1930 1922 2283
+-- TOC entry 2305 (class 2606 OID 22124)
+-- Dependencies: 1930 1922 2286
 -- Name: tour_users_fk; Type: FK CONSTRAINT; Schema: public; Owner: vtourUser
 --
 
 ALTER TABLE ONLY tours
-    ADD CONSTRAINT tour_users_fk FOREIGN KEY ("user") REFERENCES users(id);
+    ADD CONSTRAINT tour_users_fk FOREIGN KEY (user_id) REFERENCES users(id);
 
 
 --
--- TOC entry 2306 (class 0 OID 0)
+-- TOC entry 2309 (class 0 OID 0)
 -- Dependencies: 4
 -- Name: public; Type: ACL; Schema: -; Owner: postgres
 --
@@ -11206,7 +11210,7 @@ GRANT ALL ON SCHEMA public TO postgres;
 GRANT ALL ON SCHEMA public TO PUBLIC;
 
 
--- Completed on 2008-05-19 23:25:51 EDT
+-- Completed on 2008-06-02 23:37:23 EDT
 
 --
 -- PostgreSQL database dump complete

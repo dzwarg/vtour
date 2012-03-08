@@ -1,8 +1,13 @@
 <html>
 <head>
-  <script src="OpenLayers/OpenLayers.js"></script>
+  <script src="OpenLayers-2.6/lib/OpenLayers.js"></script>
   <script type="text/javascript">
-		var basehref = "http://localhost/~davidz/users"
+		var basehref = "http://www.spondubone.net/~davidz/users"
+		OpenLayers.Ajax.Responders.register( { onCreate:function(req,resp) {
+			if ( req.method == 'post' && req.options.method == 'delete' )
+				req.method = 'delete';
+		}});
+
 		function makerequest( method, pathinfo, parameters, data, reqHeaders ) {
 				var obj = null;
 
@@ -52,7 +57,6 @@
 				var tc = makerequest( "delete", "/" + id + "/setting/" + name, "", "", [ "vtauth", secret ] )
 				return tc
 		}
-/*
 
 		function test_01_setting_add(t) {
 				t.plan( 6 )
@@ -126,7 +130,7 @@
 				deletetestuser( usr )
 				// end teardown
     }
- 
+
 		function test_05_setting_full(t) {
 				t.plan(5)
 
@@ -200,7 +204,6 @@
 				deletetestuser( usr )
 				// end teardown
 		}
-*/
 
 		function test_08_setting_empty_value(t) {
 				t.plan(6)
