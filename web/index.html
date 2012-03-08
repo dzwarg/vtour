@@ -19,12 +19,27 @@
     Ext.onReady(function(){
 
       var state = new Ext.state.CookieProvider();
-      Ext.state.Manager.setProvider( state );
+      //Ext.state.Manager.setProvider( state );
       
       var welcomeTemplate = new Ext.Template( 'Welcome, {0}' );
-      var TourRecord = Ext.data.Record.create([ 'name', 'id', 'bbox' ]);
+      var TourRecord = Ext.data.Record.create([ 'name', 'id', 'bbox', { name: 'date', type: 'date' } ]);
+      TourRecord.prototype.toString = function() {
+        return this.get('id') + ':' + 
+          this.get('name') + ':' + 
+          this.get('bbox') + ':' + 
+          this.get('date').valueOf();
+      };
+      TourRecord.fromString = function(str) {
+        var tInfo = str.split(/:/);
+        return new TourRecord({
+          id: tInfo[0],
+          name: tInfo[1], 
+          bbox: tInfo[2], 
+          date: new Date(parseInt(tInfo[3],10))
+        });
+      };
       var myTourStore = new Ext.data.SimpleStore({
-        fields: [ 'name', 'id', 'bbox' ],
+        fields: [ 'name', 'id', 'bbox', 'date' ],
         data: []
       });
 
@@ -55,7 +70,11 @@
               }
             }
 
-            var prjBounds = vtour.projectBounds( searches[index].geometry.getBounds(), true );
+            var prjBounds = new OpenLayers.Bounds();
+            prjBounds.extend( searches[index].geometry.getBounds() );
+            prjBounds.transform(
+              vtour.ol_map.projection, vtour.ol_map.displayProjection
+            );
             var constraints = {
               perPage: Math.floor(vtour.results.activeTab.el.getWidth()/93),
               fromdate: fixDate(searches[index].attributes[ 'fromdate' ]),
@@ -81,21 +100,23 @@
           if ( idx >= searches.length )
             return;
 
-          new OpenLayers.Ajax.Request(vtour.fsurl + '/result?queryable=search' +
-            '&search='+searches[idx].fid+'&format=geojson', {
-            method: 'get',
-            requestHeaders: ['Accept','application/json'],
-            asynchronous: true,
-            onSuccess: function(xhr) {
+          OpenLayers.Request.issue({
+            url: vtour.fsurl + '/result',
+            params: { 
+              queryable: 'search', 
+              search: searches[idx].fid, 
+              format: 'geojson' 
+            },
+            method: 'GET',
+            headers: {'Accept':'application/json'},
+            async: true,
+            success: function(xhr) {
               var results = vtour.geojson.read( xhr.responseText, 'FeatureCollection' );
 
               for ( var i = 0; i < results.length; i++ ) {
-                results[i].geometry.transformed = false;
-                var newGeom = results[i].geometry.transform(
-                  vtour.ol_map.projection, vtour.ol_map.displayProjection );
                 var detail = {
                   tags: 'some tags',
-                  position: { lon: newGeom.x, lat: newGeom.y },
+                  position: { lon: results[i].geometry.x, lat: results[i].geometry.y },
                   image: (function(img){
                     var i = new Image();
                     i.src = img;
@@ -107,7 +128,10 @@
                 };
 
                 var comp = vtour.results.getComponent(idx+1);
-                vtour.showDetail( detail, comp.el.id );
+
+                results[i].attributes.detail = detail;
+                results[i].attributes.searchElem = comp.el.id;
+                vtour.showDetail( results[i] );
               }
 
               setTimeout( function(){ addResultToDisplay2(idx+1); }, 100 );
@@ -135,12 +159,27 @@
               vtour.results.remove( vtour.results.getComponent(1) );
             }
 
-            new OpenLayers.Ajax.Request(vtour.fsurl + '/search?queryable=tour' +
-              '&tour='+record.get('id')+'&format=geojson', {
-              method: 'get', 
-              requestHeaders: ['Accept', 'application/json'],
-              asynchronous: true,
-              onSuccess: function( xhr ){
+            // update the name of the tour in the mgmt panel
+            var fld = tourMgmtPanel.getForm().findField('tourName');
+            var vDator = fld.validator;
+            fld.validator = function(v){ return true; };
+            fld.setValue( record.get('name') );
+            fld.validator = vDator;
+
+            // update the creation date in the mgmt panel
+            Ext.get('tourMgmtCreateTime').update('Created on: '+record.get('date').format('m/d/y'));
+
+            OpenLayers.Request.issue({
+              url: vtour.fsurl + '/search',
+              params: { 
+                queryable: 'tour',
+                tour: record.get('id'), 
+                format: 'geojson'
+              },
+              method: 'GET', 
+              headers: {'Accept': 'application/json'},
+              async: true,
+              success: function( xhr ){
                 var searches = vtour.geojson.read( xhr.responseText, 'FeatureCollection' );
 
                 for( var i = 0; i < searches.length; i++ ) {
@@ -241,24 +280,31 @@
                 tourCombo.setValue( 'Loading...' );
 
                 // get all tours owned by this user
-                new OpenLayers.Ajax.Request(vtour.fsurl + '/tour?queryable=user_id' +
-                  '&user_id='+action.result.user.id + '&format=geojson', {
-                  method: 'get', 
-                  requestHeaders: ['Accept', 'application/json'],
-                  asynchronous: true,
-                  onSuccess: function( xhr ){
+                OpenLayers.Request.issue({
+                  url: vtour.fsurl + '/tour',
+                  params: { 
+                    queryable: 'user_id', 
+                    user_id: action.result.user.id, 
+                    format: 'geojson' 
+                  },
+                  method: 'GET', 
+                  headers: {'Accept': 'application/json'},
+                  async: true,
+                  success: function( xhr ){
                     var tours = vtour.geojson.read( xhr.responseText, 'FeatureCollection' );
 
                     var tourRecs = [];
                     var tourState = [];
                     for ( var i = 0; i < tours.length; i++ ) {
-                      tourRecs.push( new TourRecord({
+                      var tRec = new TourRecord({
                         name: tours[i].attributes.name,
+                        date: Date.parseDate(tours[i].attributes.date, "Y-m-d"),
                         id: tours[i].fid,
                         bbox: tours[i].geometry.getBounds().toBBOX()
-                      }) );
+                      });
 
-                      tourState.push( tours[i].fid + ':' + tours[i].attributes.name );
+                      tourRecs.push( tRec );
+                      tourState.push( tRec.toString() );
                     }
 
                     myTourStore.add( tourRecs );
@@ -563,21 +609,25 @@
             )
           }
 
-          // disable save button, indicate that the tour has been saved
-          tourSaveBtn.enable();
-          tourSaveBtn.setText('Save');
-
-          Ext.MessageBox.alert( 'Yay!', 'Your tour has been saved.' );
+          // indicate that the tour has been saved
+          // hide the waiting indicator
+          vtour.wait.hide();
 
           var tRec = new TourRecord({ 
-            name: tour[0].attributes.name, 
+            name: tour[0].attributes.name,
+            date: Date.parseDate(tour[0].attributes.date, "Y-m-d"),
             id: tour[0].fid,
             bbox: tour[0].geometry.getBounds().toBBOX()
           });
           myTourStore.add( [tRec] );
+
           var tourSet = state.get( 'vtour_tours', '' );
-          tourSet += tRec.get('id') + ':' + tRec.get('name');
+          tourSet += tRec.get('id') + ':' + tRec.get('name') + ':' + tRec.get('date').valueOf();
           state.set( 'vtour_tours', tourSet );
+
+          // update the saved time in the mgmt panel
+          var created = Ext.get('tourMgmtCreateTime');
+          created.update( 'Created on: ' + tRec.get('date').format('m/d/y') );
         };
       };
 
@@ -585,15 +635,13 @@
         return function( btn, evt ) {
           if ( !frm.isValid() ) return;
 
-          var tourName = frm.findField('name').getValue();
+          var tourName = frm.findField('tourName').getValue();
           if ( tourName === '' ) {
-            frm.findField('name').markInvalid();
+            frm.findField('tourName').markInvalid();
             return;
           }
 
-          // disable the button
-          btn.disable();
-          btn.setText('Saving...');
+          vtour.wait = Ext.MessageBox.wait( 'Saving Tour...' );
 
           var id = state.get( 'vtour_userid', 0 );
           vtour.saveTour( id, tourName, new Date(),
@@ -606,35 +654,56 @@
         };
       };
 
-      var tourNameField = new Ext.form.TextField({
-        name: 'name',
-        width: 200,
-        invalidText: 'Enter a name for the tour. Each tour must have a unique name.',
-        validator: function( newVal ) {
-          if ( newVal === '' ) return false;
+      var delSearchHandler = function(resp) {
+        alert( resp.responseText );
+      };
 
-          var valid = false;
-
-          new OpenLayers.Ajax.Request(vtour.fsurl + '/tour?queryable=name,user_id' +
-            '&name='+newVal+'&user_id='+state.get('vtour_userid')+'&format=geojson', {
-            method: 'get', 
-            requestHeaders: ['Accept', 'application/json'],
-            asynchronous: false,
-            onSuccess: function( xhr ){ 
-              var resp = vtour.geojson.read( xhr.responseText, 'FeatureCollection' );
-              valid = (resp.length === 0); 
+      var delTourHandler = function(frm) {
+        return function( btn, evt ){
+          var tourField = frm.findField('tourName');
+          var created = Ext.get('tourMgmtCreateTime');
+          if ( created && (/unsaved/i).test( created.dom.innerHTML ) ) {
+            // remove all searches
+            while (vtour.results.getComponent(1) != null) {
+              vtour.results.remove( vtour.results.getComponent(1) );
             }
-          });
 
-          return valid;
-        }
-      });
+            tourField.setValue('Untitled 1');
+            created.update('Unsaved');
+          }
+          else {
+            var tourName = tourCombo.getValue();
+            var tInd = myTourStore.find('name',tourName);
+            if (tInd >= 0) {
+              var tRec = myTourStore.getAt(tInd);
+              vtour.deleteTour( tRec.get('id'), 
+              function(tourId) {
+                tInd = myTourStore.find('id',tourId);
+                myTourStore.remove( myTourStore.getAt(tInd) );
+                var tourState = [];
+                for( var i=0; i < myTourStore.getCount(); i++ ) {
+                  tRec = myTourStore.getAt(i);
+                  tourState.push( tRec.toString() );
+                }
+                state.set( 'vtour_tours', tourState.join(';') );
 
-      var tourSaveBtn = new Ext.Button({
-        style: 'padding-left:2px;',
-        width: 100,
-        text: 'Save'
-      });
+                // remove all searches
+                while (vtour.results.getComponent(1) != null) {
+                  vtour.results.remove( vtour.results.getComponent(1) );
+                }
+
+                tourField.setValue('Untitled 1');
+                created.update('Unsaved');
+
+                tourCombo.clearValue();
+              },
+              function(){ 
+                Ext.MessageBox( 'Oops', 'Error deleting tour, please try again later.'); 
+              });
+            }
+          }
+        };
+      };
 
       var tourMgmtPanel = new Ext.form.FormPanel({
 	// provide tour management
@@ -653,22 +722,54 @@
                 name: 'tourName',
                 selectOnFocus: true,
                 style: 'font-size:2em;height:1.3em;margin-bottom:10px;',
-                value: 'Untitled 1'
+                value: 'Untitled 1',
+                invalidText: 'Enter a name for the tour. Each tour must have a unique name.',
+                validator: function( newVal ) {
+                  if ( newVal === '' ) return false;
+
+                  var valid = false;
+                  if ( vtour && vtour.fsurl && vtour.geojson ) {
+                    OpenLayers.Request.issue({
+                      url: vtour.fsurl + '/tour',
+                      params: { 
+                        queryable: 'name,user_id', 
+                        name: newVal, 
+                        user_id: state.get('vtour_userid'),
+                        format: 'geojson' 
+                      },
+                      method: 'GET', 
+                      headers: {'Accept': 'application/json'},
+                      async: false,
+                      success: function( xhr ){ 
+                        var resp = vtour.geojson.read( xhr.responseText, 'FeatureCollection' );
+                        valid = (resp.length === 0); 
+                      }
+                    });
+                  }
+                  else {
+                    // the field is validated once at the beginning, before
+                    // the vtour.* objects exist
+                    valid = true;
+                  }
+
+                  return valid;
+                }
               }),
               new Ext.Panel({
                 border: false,
                 layout: 'column',
                 defaults: { 
                   border: false,
+                  bodyBorder: true,
                   ctCls: 'opContainer',
                   cls: 'opPanel'
                 },
                 items: [
                   {
                     contentEl: 'saveBtnPanel'
-                  },{
+                  }, /*{
                     contentEl: 'copyBtnPanel'
-                  },{
+                  },*/ {
                     contentEl: 'delBtnPanel'
                   }
                 ],
@@ -688,6 +789,12 @@
                         cmp.body.removeClass('opOver');
                       });
                     }
+
+                    var save = Ext.get('saveBtnPanel');
+                    save.on('click', saveTourHandler( tourMgmtPanel.getForm() ) );
+
+                    var del = Ext.get('delBtnPanel');
+                    del.on('click', delTourHandler( tourMgmtPanel.getForm() ) );
                   }
                 }
               })
@@ -709,15 +816,12 @@
                 html: '0 results' 
               },{
                 id: 'tourMgmtCreateTime',
-                html: 'not saved yet' 
+                html: 'Unsaved' 
               }
             ]
           })
 	]
       });
-
-      tourSaveBtn.on('click', saveTourHandler( tourMgmtPanel.getForm() ) );
-
 
       vtour.results = new Ext.TabPanel({
         id:'resultTabs',
@@ -810,14 +914,16 @@
 
         Ext.get('welcomePanel').update( welcomeTemplate.apply( [state.get('vtour_user')] ) );
 
-        var tourState = state.get( 'vtour_tours', '' ).split(/;/);
-        var tours = [];
-        for ( var i = 0; i < tourState.length; i++ ) {
-          var tInfo = tourState[i].split(/:/);
-          tours.push( new TourRecord( { id: tInfo[0], name: tInfo[1] } ) );
-        }
+        var tourState = state.get( 'vtour_tours', '' );
+        if ( tourState != '' ) {
+          tourState = tourState.split(/;/);
+          var tours = [];
+          for ( var i = 0; i < tourState.length; i++ ) {
+            tours.push( TourRecord.fromString( tourState[i] ) );
+          }
 
-        myTourStore.add( tours );
+          myTourStore.add( tours );
+        }
       }
 
       viewport.on( {
@@ -834,12 +940,13 @@
         e.stopEvent();
         var target = e.getTarget('div.thumb');
         if ( target ) {
+          var pos = new OpenLayers.LonLat(
+            parseFloat(target.getAttribute( 'ext:position' ).split(',')[0]),
+            parseFloat(target.getAttribute( 'ext:position' ).split(',')[1])
+          );
           var detail = {
             tags: target.getAttribute( 'ext:tags' ),
-            position: {
-              lon: parseFloat(target.getAttribute( 'ext:position' ).split(',')[0]),
-              lat: parseFloat(target.getAttribute( 'ext:position' ).split(',')[1])
-            },
+            position: pos.transform(vtour.ol_map.displayProjection, vtour.ol_map.projection),
             image: (function(img){
 	      var i = new Image();
 	      i.src = img;
@@ -849,8 +956,16 @@
 	    imageid: target.getAttribute( 'ext:imageid' ),
 	    owner: target.getAttribute( 'ext:owner' )
           }
+
+          var feature = new OpenLayers.Feature.Vector(
+            new OpenLayers.Geometry.Point(pos.lon, pos.lat),
+            {
+              searchElem: vtour.results.activeTab.el.id,
+              searchDetail: detail
+            }
+          );
           
-          vtour.showDetail( detail, vtour.results.activeTab.el.id );
+          vtour.showDetail( feature );
         }
       }); 
       
@@ -1121,19 +1236,26 @@
       font-size:0.75em;
     }
     .opPanel {
-      height: 75px;
-      width: 75px;
+      height: 65px;
+      width: 65px;
       margin-left:5px;
       margin-right:5px;
     }
     .opPanel img {
-      width: 50px;
+      width: 40px;
     }
     .opPanel a {
       text-decoration:none;
     }
+    .opPanel div {
+      border: 1px solid white;
+    }
     .opOver {
-      background-color:#ff0000;
+      background-color:#eeeeee;
+      cursor:pointer;
+    }
+    .opOver div {
+      border-color: #bbbbbb;
     }
     
     /** paging toolbar and dataview **/
@@ -1374,7 +1496,10 @@
 
       vtour.ol_layers['features'].addFeatures([polygonFeature]);
 
-      var prjBounds = vtour.projectBounds( myBounds, true );
+      var prjBounds = myBounds.transform(
+        vtour.ol_map.projection,
+        vtour.ol_map.displayProjection
+      );
 
       // get settings from the UI
       var datefrm = vtour.datePanel.getForm();
@@ -1390,41 +1515,7 @@
       vtour.getFlickrPhotos( prjBounds.toBBOX(), polygonFeature, constraints );
     };
 
-    vtour.projectBounds = function( bounds, fwd ) {
-      var pts = bounds.toArray();
-      var fromProj = (fwd) ? vtour.ol_map.projection.proj : vtour.ol_map.displayProjection.proj;
-      var toProj = (fwd) ? vtour.ol_map.displayProjection.proj : vtour.ol_map.projection.proj;
-      
-      var ptMin = Proj4js.transform( 
-        fromProj, 
-        toProj,
-        { x: pts[0], y: pts[1] } );
-      var ptMax = Proj4js.transform(
-        fromProj,
-        toProj,
-        { x: pts[2], y: pts[3] } );
-
-      return new OpenLayers.Bounds( ptMin.x, ptMin.y, ptMax.x, ptMax.y );
-    };
-    
-    vtour.showDetail = function( detail, comp ) {
-      // put something on the map
-      
-      // reproject from 4326
-      var pt = Proj4js.transform( 
-        vtour.ol_map.displayProjection.proj, 
-        vtour.ol_map.projection.proj, 
-        { x: detail.position.lon, y: detail.position.lat } );
-      
-      // create a feature array of 1 item
-      var feature = new OpenLayers.Feature.Vector(
-        new OpenLayers.Geometry.Point(pt.x, pt.y),
-        {
-          searchElem: comp,
-          searchDetail: detail
-        }
-      );
-
+    vtour.showDetail = function( feature ) {
       // attach to the feature layer
       vtour.ol_layers['markers'].addFeatures( [feature] );
 
@@ -1446,23 +1537,80 @@
         allBounds.extend(feature.geometry.getBounds());
       }
 
-      feature = new OpenLayers.Feature.Vector( allBounds.toGeometry(),
-	{
-	  user_id: id,
-	  name: name,
-	  date: date.format('Y-m-d'),
-	  public: false
-	}
-      ); 
-
-      new OpenLayers.Ajax.Request(vtour.fsurl + '/tour?format=geojson', {
-	method: 'post', 
-	postBody: vtour.geojson.write(feature),
-	requestHeaders: ['Accept', 'application/json'],
-	asynchronous: false,
-	onSuccess: success,
-	onFailure: failure
+      feature = new OpenLayers.Feature.Vector( allBounds.toGeometry(), {
+        user_id: id,
+        name: name,
+        date: date.format('Y-m-d'),
+        public: false
       });
+
+      OpenLayers.Request.issue({
+        url: vtour.fsurl + '/tour',
+        params: { format:'geojson' },
+	method: 'POST', 
+	data: vtour.geojson.write(feature),
+	headers: {'Accept': 'application/json'},
+	async: false,
+	success: success,
+	failure: failure
+      });
+    };
+
+    vtour.deleteTour = function( id, success, failure ) {
+      var wait = Ext.MessageBox.wait( 'Deleting...' );
+      var fail = false;
+      // delete all results 1st
+      for( var i=0; i< vtour.ol_layers['markers'].features.length; i++ ) {
+        var result = vtour.ol_layers['markers'].features[i];
+        OpenLayers.Request.issue({
+          url:vtour.fsurl + '/result/' + result.fid,
+          method:'DELETE',
+          headers: { 'Accept':'application/json' },
+          async: false,
+          success: function(){ OpenLayers.Console.debug( '    deleted  result ' + result.fid ); },
+          failure: function(){ 
+            fail = true;
+            OpenLayers.Console.debug( 'ERR deleting result ' + result.fid ); 
+          }
+        });
+      }
+
+      // delete all searches 2nd
+      for ( var i=0; i<vtour.ol_layers['features'].features.length; i++ ) {
+        var search = vtour.ol_layers['features'].features[i];
+        OpenLayers.Request.issue({
+          url:vtour.fsurl + '/search/' + search.fid,
+          method:'DELETE',
+          headers: {'Accept':'application/json' },
+          async: false,
+          success: function(){ OpenLayers.Console.debug( '    deleted  search ' + search.fid ); },
+          failure: function(){ 
+            fail = true;
+            OpenLayers.Console.debug( 'ERR deleting search ' + search.fid ); 
+          }
+        });
+      }
+      
+      OpenLayers.Request.issue({
+        url:vtour.fsurl + '/tour/' + id,
+        method: 'DELETE',
+        headers: { 'Accept':'application/json' },
+        async: false,
+        success: function(){ OpenLayers.Console.debug( '    deleted  tour ' + id ); },
+        failure: function(){ 
+          fail = true;
+          OpenLayers.Console.debug( 'ERR deleting tour '+ id ); 
+        } 
+      });
+
+      wait.hide();
+
+      if ( fail ) {
+        failure();
+      }
+      else {
+        success( id );
+      }
     };
 
     vtour.saveSearch = function( userId, tourId, feature, success, failure ) {
@@ -1474,13 +1622,15 @@
         tags: feature.attributes['tags']
       } );
 
-      new OpenLayers.Ajax.Request(vtour.fsurl + '/search?format=geojson', {
-        method: 'post',
-        postBody: vtour.geojson.write(feat),
-        requestHeaders: ['Accept', 'application/json'],
-        asynchronous: false,
-        onSuccess: success,
-        onFailure: failure
+      OpenLayers.Request.issue({
+        url: vtour.fsurl + '/search',
+        params: { format: 'geojson' },
+        method: 'POST',
+        data: vtour.geojson.write(feat),
+        headers: { 'Accept': 'application/json' },
+        async: false,
+        success: success,
+        failure: failure
       });
     };
 
@@ -1498,13 +1648,14 @@
         }
       );
 
-      new OpenLayers.Ajax.Request(vtour.fsurl + '/result', {
-        method: 'post',
-        postBody: vtour.geojson.write(feat),
-        requestHeaders: ['Accept', 'application/json'],
-        asynchronous: false,
-        onSuccess: success,
-        onFailure: failure
+      OpenLayers.Request.issue({
+        url: vtour.fsurl + '/result',  
+        method: 'POST',
+        data: vtour.geojson.write(feat),
+        headers: {'Accept': 'application/json'},
+        async: false,
+        success: success,
+        failure: failure
       });
     };
   </script>
@@ -1571,9 +1722,9 @@
       </li>
     </ul>
   </div>
-  <div id="saveBtnPanel"><a href="#"><img src="gtk-save.png"/></a><br/><a href="#">Save</a></div>
-  <div id="copyBtnPanel"><a href="#"><img src="gtk-copy.png"/></a><br/><a href="#">Copy</a></div>
-  <div id="delBtnPanel"><a href="#"><img src="gtk-clear.png"/></a><br/><a href="#">Delete</a></div>
+  <div id="saveBtnPanel"><img src="gtk-save.png"/><br/>Save</div>
+  <!-- <div id="copyBtnPanel"><img src="gtk-copy.png"/><br/>Copy</div> -->
+  <div id="delBtnPanel"><img src="gtk-clear.png"/><br/>Delete</div>
   <div id="south">
     <p>Click on the map to search for photos.</p>
   </div>
