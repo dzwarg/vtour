@@ -66,7 +66,6 @@ function markPt(_e, _c){
 
       var index = tour.indexOfMarker( myPoint.Marker );
  
-      alert( 'removing '+index );
       tour.removePoint( index );
 
       map.addOverlay( tour.getPolyline() );
@@ -275,7 +274,7 @@ function nextPoint()
   var photosDiv = document.getElementById('photos');
   var strips = photosDiv.childNodes;
 
-  for ( var stripIndex = (strips.length-1); stripIndex >= 0; stripIndex-- )
+  for ( var stripIndex = (strips.length-2); stripIndex >= 0; stripIndex-- )
   {
     if ( strips[stripIndex].style.display == 'block' )
     {

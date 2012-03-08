@@ -25,6 +25,14 @@
 
 <div id="mapExt">
   <div id="map"></div>
+  <div id="help">
+      <h1>Welcome</h1>
+      <p>You can use this site to find photographs from photo-sharing
+      services that geocode photographs, like Flickr (and soon Panoramio).</p>
+
+      <p>To begin, just start clicking on the map to find photographs near
+      that place.</p>
+    </div>
 </div>
 
 <div id="lightslide">
@@ -38,14 +46,13 @@
     <div class="slideButton" onclick="nextPoint();">&rarr;</div>
   </div>
 
+  <div id="waiting">
+    <img src="progress.gif"/>
+  </div>
 </div>
 
 <div id="pager">
   <span id="pagerNow">0</span> / <span id="pagerTotal">0</span>
-</div>
-
-<div id="waiting">
-  <img src="progress.gif"/>
 </div>
 
 <div id="debug">

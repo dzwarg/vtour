@@ -5,15 +5,19 @@ html
 body
 {
   margin:0px 0px 0px 0px;
-  font:12pt arial,helvetica,sans-serif;
+  font:10pt arial,helvetica,sans-serif;
 }
 .banner
 {
-  position:absolute;
   z-index:1;
+  position:absolute;
   top:0px;
   left:0px;
-  margin:3px;
+  padding:3px;
+}
+.gradient
+{
+  background:#ffffff url(bkg.jpg) repeat-x fixed top;
 }
 h1
 {
@@ -37,12 +41,10 @@ h1
 }
 .actionbutton
 {
-  border:#9999ff solid 1px;
-  font-size:20pt;
-  background-color:#eeeedd;
-  color:#0000cc;
-  width:15em;
-  height:1.25em;
+  border:#dddddd solid 1px;
+  font-size:2em;
+  background-color:#eeeeee;
+  color:#000000;
 }
 #lightslide
 {
@@ -132,8 +134,12 @@ h1
 .search
 {
   position:absolute;
-  top:0.5em;
+  top:0.2em;
   right:1em;
+}
+.search input
+{
+  border:solid #dddddd 1px;
 }
 .smallText
 {

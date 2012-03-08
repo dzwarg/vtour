@@ -26,7 +26,11 @@ Tour.prototype.removePoint = function( index )
 {
   if ( index >= 0 && index < this.TourPoints.length - 1 )
   {
+    var pt = this.TourPoints.slice( index, 1 );
     this.TourPoints.splice( index, 1 );
+    var cont = pt.PhotoPanel.parentNode;
+    cont.removeChild( pt.PhotoPanel );
+    this.UpdatePhotoPaging( cont );
     this.TourPolyline = null;
   }
 };
@@ -261,12 +265,15 @@ TourPoint.prototype.fetchPhotosCallback = function( rsp )
 
   photoDiv.appendChild( this.MorePhotoInfo( rsp ) );
 
-  this.PhotoPanel = photoDiv;
+  if ( this.PhotoPanel == null )
+  {
+    this.PhotoPanel = photoDiv;
 
-  photosDiv.appendChild( photoDiv );
+    photosDiv.appendChild( photoDiv );
 
-  this.ShowLastPhotoPanel( photosDiv );
-  this.UpdatePhotoPaging( photosDiv );
+    this.ShowLastPhotoPanel( photosDiv );
+    this.UpdatePhotoPaging( photosDiv );
+  }
 };
 
 TourPoint.prototype.MorePhotoInfo = function( rsp )
@@ -313,6 +320,8 @@ TourPoint.prototype.MorePhotosFunction = function(dir)
 
     //&page=1
     var newUrl = caller.SearchUrl.replace( /\%26page\%3D\d+/, '%26page%3D' + caller.ResultsPage);
+
+    caller.SearchUrl = newUrl;
     
     caller.SendFetchRequest( caller.SearchUrl, waiting );
   };
