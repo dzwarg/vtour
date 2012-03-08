@@ -474,3 +474,9 @@ function hideTooltip()
 
   tooltip.style.display = 'none';
 }
+
+function showHelp(item)
+{
+  var itemDiv = document.getElementById('help_'+item);
+  itemDiv.className = 'centered';
+}

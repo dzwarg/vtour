@@ -227,6 +227,7 @@ TourPoint.prototype.fetchPhotosCallback = function( rsp )
   {
     photoDiv = document.createElement('div');
     photoDiv.id = 'photos' + this.Marker.id;
+    photoDiv.className = 'photoStrip';
   }
   else
   {
@@ -298,7 +299,7 @@ TourPoint.prototype.MorePhotoInfo = function( rsp )
   to = ( rsp.photos.total < to ) ? rsp.photos.total : to;
 
   var info = document.createElement('div');
-  info.className = 'smalltext';
+  info.className = 'smallText';
 
   if ( from > 1 )
   {

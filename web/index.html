@@ -91,10 +91,8 @@
 
   <div id="photos"></div>
 
-  <div id="nextPhotos" class="tooltip">
-    <div class="tooltipText">
-      Next
-    </div>
+  <div id="nextPhotos" onmouseover="showTooltip(event,'Next','L');"
+       onmouseout="hideTooltip();">
     <div class="slideButton" onclick="nextPoint();">&rarr;</div>
   </div>
 </div>

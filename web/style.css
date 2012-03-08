@@ -29,7 +29,7 @@ h1.pagetitle
   margin-top: 2em;
 }
 #map{
-  height: 30em;
+  height: 35em;
   width: auto;
 }
 #help {
@@ -37,11 +37,15 @@ h1.pagetitle
   right:4em;
   width:20em;
   top:4em;
-  height:25em;
+  height:30em;
   background-color:#ffffcc;
   padding:0.5em;
   opacity:0.85;
   overflow-y:auto;
+  border:solid 1px #cccccc;
+}
+#help p {
+  font-size: 80%;
 }
 .actionpanel
 {
@@ -54,7 +58,7 @@ h1.pagetitle
 {
   border:#dddddd solid 1px;
   background-color:#eeeeee;
-  color:#000000;
+  color:#cc0000;
 }
 #lightslide
 {
