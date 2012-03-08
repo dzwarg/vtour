@@ -227,7 +227,6 @@ TourPoint.prototype.fetchPhotosCallback = function( rsp )
   {
     photoDiv = document.createElement('div');
     photoDiv.id = 'photos' + this.Marker.id;
-    photoDiv.className = 'photoStrip';
   }
   else
   {
@@ -256,17 +255,23 @@ TourPoint.prototype.fetchPhotosCallback = function( rsp )
     var photoItem = document.createElement('div');
     photoItem.className = 'photoItem';
 
+    var link = document.createElement('a');
+    link.href = '#';
+    link.onclick = getImageInfo;
+    link.flickrInfo = { id:photo.id, secret:photo.secret, url:pictURL };
+
     var img = document.createElement('img');
     img.src = thumbURL;
     img.alt = photo.title;
-    img.flickrInfo = { id:photo.id, secret:photo.secret, url:pictURL };
-    img.onclick = getImageInfo;
+    img.style.borderWidth = '0px';
+
+    link.appendChild( img );
 
     var loaderImg = document.createElement('img');
     loaderImg.className = 'itemLoader';
     loaderImg.src = 'indicator_arrows_circle.gif';
 
-    photoItem.appendChild( img );
+    photoItem.appendChild( link );
     photoItem.appendChild( document.createElement('br') );
     photoItem.appendChild( loaderImg );
 

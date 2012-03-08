@@ -375,17 +375,20 @@ function photoInfoResponse(rsp,url)
   var marker = new YMarker( geoPt, createCameraIcon() );
   resultMarkers.push( marker );
 
-  var markup = '<a href="' + rsp.photo.urls.url[0]._content + '">' +
-    '<img src="' + url + '" alt="' + rsp.photo.title._content + 
-    '" border="0"/></a>' + '<center><a href="' + 
+  var markup = '<div class="photoPopup"><a href="' + 
+    rsp.photo.urls.url[0]._content + '"><img src="' + url + '" alt="' +
+    rsp.photo.title._content + '" border="0"/></a>' + '<center><a href="' + 
     rsp.photo.urls.url[0]._content + '">' + rsp.photo.urls.url[0].type + 
-    '</a><br/>' + rsp.photo.title._content + '</center>';
+    '</a><br/>' + rsp.photo.title._content + '</center></div>';
 
   YEvent.Capture( marker, EventsList.MouseClick,
     function(){
       marker.openSmartWindow( markup );
     }
   );
+
+  var preCache = new Image();
+  preCache.src = url;
 
   map.addOverlay( marker );
   marker.addAutoExpand('show photo');

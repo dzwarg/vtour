@@ -169,3 +169,15 @@ div#close {
 {
   font-size:9pt;
 }
+.centered {
+  text-align:center;
+}
+#tooltip {
+  position:absolute;
+  display:none;
+  top:0px;
+  left:0px;
+  border:solid 1px #cccccc;
+  background:#ffffbb;
+  opacity:0.8;
+}
