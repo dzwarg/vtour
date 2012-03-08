@@ -1,131 +1,305 @@
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
 <html>
 <head>
-<script type="text/javascript" src="http://api.maps.yahoo.com/ajaxymap?v=3.7&appid=APP-ID">
-</script>
-<link rel="stylesheet" type="text/css" href="style.css"/>
-<script type="text/javascript" src="tour.js"></script>
-<script type="text/javascript" src="script.js"></script>
+  <title>vTour</title>
+
+  <!-- ExtJS scripts -->
+	<link rel="stylesheet" type="text/css" href="ext-2.0/resources/css/ext-all.css" />
+ 	<link rel="stylesheet" type="text/css" href="ext-2.0/resources/css/xtheme-gray.css" />
+ 	<script type="text/javascript" src="ext-2.0/adapter/ext/ext-base.js"></script>
+  <script type="text/javascript" src="ext-2.0/ext-all.js"></script>
+	<script type="text/javascript">
+    var resultTabPanel = new Ext.TabPanel({
+      activeTab:0,
+      items:[{
+        contentEl:'south',
+        title:'Search 1',
+        autoScroll:true,
+        closable:false
+      }]
+    });
+
+    Ext.onReady(function(){
+
+      Ext.state.Manager.setProvider(new Ext.state.CookieProvider());
+        
+      // setup the viewport
+      var viewport = new Ext.Viewport({
+        layout:'border',
+        items:[{
+          region:'center',
+          deferredRender:false,
+          contentEl:'center',
+          margins:'0 0 0 0'
+        },{
+          region:'east',
+          layout:'accordion',
+          width:200,
+          defaults: {
+            // applied to each contained panel
+            bodyStyle:'margin:5px'
+          },
+          items:[{
+            title:'Map Layers',
+            contentEl:'mapLayerSwitcherPanel'
+          }]
+        },{
+          region:'south',
+          title:'Search Results',
+          collapsible:false,
+          split:false,
+          height:150,
+          margins:'0 0 0 0',
+          items:[	resultTabPanel ]
+        }]
+      });
+
+      viewport.on( {
+        'resize': function( obj, adjWidth, adjHeight, rawWidth, rawHeight ){ 
+          if ( ol_resize ) {
+            ol_resize();
+          }
+        }
+      });
+
+    });
+
+		// get items from flickr
+		var flickrkey='FLICKR-KEY';
+		var furl = 'http://api.flickr.com/services/rest/?';
+		var fstore = new Array();
+
+		function getPhotosIn( olPtList ) {
+			var bbox = getBoundsFlickrString( olPtList );
+	
+			// todo: make date limit user adjustable
+			var dateLimit = new Date();
+			dateLimit.setFullYear( dateLimit.getFullYear() - 1 );
+
+			var url = furl;
+			var params = { method: 'flickr.photos.search',
+				format: 'json',
+				api_key: flickrkey,
+	    	bbox: bbox,	
+	    	min_taken_date: dateLimit.getFullYear() + 
+	                   '-' + (dateLimit.getMonth() + 1) +
+	                   '-' + dateLimit.getDate(),
+				page: 1,
+	    	per_page: 10,
+				jsoncallback: 'fSearchResponse' };
+
+			var req = new Ext.data.ScriptTagProxy({ url:url });
+
+			var scp = null;
+			var arg = null;
+			var callback = null;
+			var reader = null;
+			req.load( params, reader, callback, scp, arg ); 
+		}
+
+		function fSearchResponse( fRsp )
+		{
+			var data = fRsp.photos;
+			var success = fRsp.stat;
+
+			fstore.push( new Ext.data.JsonStore({
+				root:'photo',
+				id:'id',
+				fields:['owner','secret','server','farm','title','ispublic','isfriend','isfamily'],
+				data: data 
+			}));
+
+			renderResults( fstore[ fstore.length - 1 ] );
+		}
+
+		function renderResults( store )	{
+			var resultPanel = new Ext.Panel({
+				title:'Results',
+				html:'<p>Found ' + store.getCount() + ' photos there.</p>',
+				closable:true,
+				cls:'results'
+			});
+
+			var tab = resultTabPanel.getActiveTab();
+
+			resultTabPanel.add( resultPanel );
+			resultTabPanel.doLayout();
+			resultTabPanel.activate( resultPanel );
+
+			if ( tab.contentEl == 'south' )
+			{
+				resultTabPanel.remove( tab );
+				resultTabPanel.doLayout();
+			}
+		}
+
+	</script>
+  <style type="text/css">
+    div#mapLayerSwitcherPanel {
+      padding:5px 5px 5px 5px;
+    }
+		div.results {
+			height:150px;
+		}
+  </style>
+<!-- end ExtJS scripts -->
+
+<!-- OpenLayers scripts -->
+  <script type="text/javascript" src="OpenLayers/OpenLayers.js"></script>
+	<script type="text/javascript" src="OpenLayers/Projection.js"></script>
+	<script type="text/javascript" src="proj4js/proj4js.js"></script>
+<!-- <script type="text/javascript" src="http://api.maps.yahoo.com/ajaxymap?v=3.7&appid=APP-ID"></script>
+  <script type="text/javascript" src="http://maps.google.com/maps?file=api&v=2.82&key=GMAP-KEY"></script> -->
+  <script type="text/javascript">
+    var ol_map,ol_layers;
+    function ol_init(){
+      var options = {
+        projection: new OpenLayers.Projection('EPSG:900913'),
+        displayProjection: new OpenLayers.Projection('EPSG:4326'),
+        units: 'm',
+        maxResolution: 156543.0339,
+        maxExtent: new OpenLayers.Bounds(-20037508, -20037508,
+                                          20037508, 20037508.34)
+      };
+
+      ol_map = new OpenLayers.Map('mapDiv', options);
+
+      ol_map.addControl(new OpenLayers.Control.KeyboardDefaults());
+      ol_map.addControl(new OpenLayers.Control.MousePosition());
+
+      ol_layers = {
+        //google: new OpenLayers.Layer.Google( 'Google', { type:G_NORMAL_MAP } ),
+        //yahoo: new OpenLayers.Layer.Yahoo( 'Yahoo' ),
+        osm: new OpenLayers.Layer.TMS( 'OpenStreetMap', 'http://tile.openstreetmap.org/',
+          { type: 'png', getURL: osm_getTileURL,
+            displayOutsideMaxExtent: true,
+            attribution: '<a href="http://www.openstreetmap.org/">OpenStreetMap</a>' }),
+        //ol: new OpenLayers.Layer.WMS( 'OpenLayers WMS', 
+        //    'http://labs.metacarta.com/wms/vmap0',
+        //    {layers: 'basic'}, {'displayInLayerSwitcher':true} ),
+        features: new OpenLayers.Layer.Vector('Bounding Boxes'),
+        markers: new OpenLayers.Layer.Markers('Markers')
+      };
+
+      for ( var key in ol_layers )
+      {
+        ol_map.addLayer( ol_layers[key] );
+      }
+
+			// -75.16337,39.95234
+      ol_map.setCenter(new OpenLayers.LonLat(-8366872, 4856084), 12);
+
+      ol_map.events.register('click', ol_map, focusRegion );
+    }
+
+    function osm_getTileURL(bounds) {
+      var res = this.map.getResolution();
+      var x = Math.round((bounds.left - this.maxExtent.left) / (res * this.tileSize.w));
+      var y = Math.round((this.maxExtent.top - bounds.top) / (res * this.tileSize.h));
+      var z = this.map.getZoom();
+      var limit = Math.pow(2, z);
+
+      if (y < 0 || y >= limit) {
+        return OpenLayers.Util.getImagesLocation() + "404.png";
+      } else {
+        x = ((x % limit) + limit) % limit;
+        return this.url + z + "/" + x + "/" + y + "." + this.type;
+      }
+    }
+
+    function ol_resize() {
+      ol_map.updateSize();
+    }
+
+    function changeLayer( element ) {
+      ol_map.setBaseLayer( ol_layers[ element.value ] );
+    }
+
+    function focusRegion(e) {
+      
+			var pointList = getRegionBounds( e.xy );
+
+      var linearRing = new OpenLayers.Geometry.LinearRing( pointList );
+      var polygonFeature = new OpenLayers.Feature.Vector(
+                new OpenLayers.Geometry.Polygon([linearRing]));
+
+      ol_layers['features'].addFeatures([polygonFeature]);
+
+			getPhotosIn( pointList );
+    }
+
+		function getRegionBounds( pixPt )
+		{
+			var minPt = new OpenLayers.Pixel();
+			minPt.x = pixPt.x - 20;
+			minPt.y = pixPt.y - 20;
+
+			var maxPt = new OpenLayers.Pixel();
+			maxPt.x = pixPt.x + 20;
+			maxPt.y = pixPt.y + 20;
+
+			var minLonlat = ol_map.getLonLatFromPixel(minPt);
+			var maxLonlat = ol_map.getLonLatFromPixel(maxPt);
+
+      var pointList = [];
+      pointList.push( new OpenLayers.Geometry.Point( minLonlat.lon, minLonlat.lat ) );
+      pointList.push( new OpenLayers.Geometry.Point( minLonlat.lon, maxLonlat.lat ) );
+      pointList.push( new OpenLayers.Geometry.Point( maxLonlat.lon, maxLonlat.lat ) );
+      pointList.push( new OpenLayers.Geometry.Point( maxLonlat.lon, minLonlat.lat ) );
+      pointList.push( pointList[0] );
+
+			return pointList;
+		}
+
+		function getBoundsFlickrString( olPtList )
+		{
+			var minx = olPtList[0].x;
+			var maxx = olPtList[0].x;
+			var miny = olPtList[0].y;
+			var maxy = olPtList[0].y;
+
+			for( var i = 0; i < olPtList.length; i++ )
+			{
+				minx = ( olPtList[i].x < minx ) ? olPtList[i].x : minx;
+				maxx = ( olPtList[i].x > maxx ) ? olPtList[i].x : maxx;
+				miny = ( olPtList[i].y < miny ) ? olPtList[i].y : miny;
+				maxy = ( olPtList[i].y > maxy ) ? olPtList[i].y : maxy;
+			}
+
+			var orig = { x: minx, y: miny };
+			var minDest = OpenLayers.Projection.transform( orig, ol_map.projection,
+				ol_map.displayProjection );
+			orig = { x: maxx, y: maxy };
+			var maxDest = OpenLayers.Projection.transform( orig, ol_map.projection,
+				ol_map.displayProjection );
+
+			return minDest.x + ',' + minDest.y + ',' + maxDest.x + ',' + maxDest.y;
+		}
+
+    window.onload = ol_init;
+  </script>
+  <style type="text/css">
+    div#mapDiv {
+      height:100%;
+      width:100%;
+    }
+  </style>
+<!-- end OpenLayers scripts -->
 </head>
-<body onload="setup();" class="gradient">
-
-<div class="banner">
-  <h1 class="pagetitle">Oh, The Places You Will Go</h1>
-</div>
-
-<div class="actionpanel">
-  <!--<input class="actionbutton" type="button" value="What Will I See?" onclick="clearTourPhotos();getTourPhotos();"/>-->
-  <input class="actionbutton" type="button" value="Start Over" onclick="clearTour();"/>
-</div>
-
-<div class="search">
-  <input type="text" name="place" id="place" onkeypress="placeInputEvent(event);" class="gradient" value="Philadelphia, PA"/>
-  <input type="button" value="Find" onclick="findPlace();" />
-</div>
-
-<div id="mapExt">
-  <div id="map"></div>
-  <div id="help">
-    <div id="close">
-      <a href="#" onclick="closeHelp();">
-        <img src="close.png" alt="[ X ]" border="0"/>
-      </a>
-    </div>
-    <div id="helpInt">
-      <h1 style="display:inline;">Welcome</h1>
-
-      <p>Use this map to find photographs that have been geotagged on 
-      <a href="http://www.flickr.com/">flickr</a> <a href="#panoramio">*</a>.
-      </p>
-
-      <p>To start, search for the place you are interested in. The search box
-      is in the upper right hand corner.  Go ahead and find your place now.
-      I'll wait. <img src="view.png" class="view" 
-      onclick="showHelp('search');"/></p>
-  
-      <div class="centered dynhelp" id="help_search">
-        <img src="search2.gif" alt="Search for 'new york, ny'"/>
-      </div>
-
-      <p>By the way, if at any point, you want to start again from scratch,
-      click on the "Start Over" button at the top. <img src="view.png" 
-      class="view" onclick="showHelp('restart');"/></p>
-
-      <div class="centered dynhelp" id="help_restart">
-        <img src="startover.jpg" alt="Start Over button"/>
-      </div>
-
-      <p>Now that you've found a place to investigate, start clicking on the
-      map.  Each click will place a marker, and search flickr for photographs
-      near the place you clicked. <img src="view.png" class="view"
-      onclick="showHelp('marker');"/></p>
-
-      <div class="centered dynhelp" id="help_marker">
-        <img src="marker.jpg" alt="Marker"/>
-      </div>
-
-      <p>As you are clicking around, photos taken near the markers will appear
-      in the light strip below the map. To view a larger version of an image,
-      click on it in the light strip.</p>
-
-      <p>Below the strip of images, the number of total photos found near this
-      point will be displayed.  Also, this will show you which set of images in
-      the search result you are viewing. <img src="view.png" class="view"
-      onclick="showHelp('paging');"/></p>
-
-      <div class="centered dynhelp" id="help_paging">
-        <img src="paging.jpg" alt="Viewing Image Set"/>
-      </div>
-
-      <p>To move forward or back in your "tour", click on the right or left
-      side of the light box, respectively. <img src="view.png" class="view"
-      onclick="showHelp('morepts');"/></p>
-
-      <div class="centered dynhelp" id="help_morepts">
-        <img src="previous.jpg" alt="Previous"/>
-        &nbsp;&nbsp;&nbsp;
-        <img src="next.jpg" alt="Next"/>
-      </div>
-
-      <hr noshade="noshade" size="1"/>
-
-      <p class="foot"><a name="panoramio">* Support for 
-      <a href="http://www.panoramio.com/">panoramio</a> is coming soon.</p>
+<body>
+  <div id="center">
+    <div id="mapDiv">
     </div>
   </div>
-</div>
-
-<div id="lightslide">
-  <div id="prevPhotos" onmouseover="showTooltip(event,'Previous','R');"
-       onmouseout="hideTooltip();">
-    <div class="slideButton" onclick="prevPoint();">
-      <img src="prev.png" alt="Previous"/>
-    </div>
+  <div id="mapLayerSwitcherPanel">
+    <ul>
+      <!-- <li><input type="radio" name="olLayerName" value="google" onclick="changeLayer(this);"/>Google</li>
+      <li><input type="radio" name="olLayerName" value="yahoo" onclick="changeLayer(this);"/>Yahoo</li> -->
+      <li><input type="radio" name="olLayerName" value="osm" onclick="changeLayer(this);" checked />OpenStreetMap</li>
+      <!-- <li><input type="radio" name="olLayerName" value="ol" onclick="changeLayer(this);"/>OpenLayers</li> -->
+    </ul>
   </div>
-
-  <div id="photos"></div>
-
-  <div id="nextPhotos" onmouseover="showTooltip(event,'Next','L');"
-       onmouseout="hideTooltip();">
-    <div class="slideButton" onclick="nextPoint();">
-      <img src="next.png" alt="Next"/>
-    </div>
+  <div id="south" class="results">
+    <p>This is south content.</p>
   </div>
-</div>
-
-<div id="pager">
-  <span id="pagerNow">0</span> / <span id="pagerTotal">0</span>
-</div>
-
-<div id="waiting">
-  Fetching images: <img src="progress.gif"/>
-</div>
-
-<div id="tooltip">
-</div>
-
-<div id="debug">
-</div>
-
-</body>
+ </body>
 </html>

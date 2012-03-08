@@ -45,7 +45,10 @@ h1.pagetitle
   border:solid 1px #cccccc;
 }
 #help p {
-  font-size: 80%;
+  font-size:80%;
+}
+#help p.foot {
+  font-size:70%;
 }
 .actionpanel
 {
@@ -183,4 +186,11 @@ div#close {
   opacity:0.8;
   font-size:80%;
   padding:3px;
+}
+img.view {
+  vertical-align:top;
+  cursor:pointer;
+}
+div.dynhelp {
+  display:none;
 }
