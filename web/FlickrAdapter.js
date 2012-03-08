@@ -126,7 +126,7 @@ Ext.reg('fpaging', vtour.FlickrPagingToolbar);
  */
 
 vtour.FlickrAdapter = function(){
-  this.key = 'd9a76ca10b3a34cf59a859843d495b63';
+  this.key = 'FLICKR-KEY';
 
   this.proxy = new Ext.data.ScriptTagProxy({
     callbackParam: 'jsoncallback',

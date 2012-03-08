@@ -8,16 +8,6 @@
  	<script type="text/javascript" src="ext-2.0/adapter/ext/ext-base.js"></script>
   <script type="text/javascript" src="ext-2.0/ext-all.js"></script>
 	<script type="text/javascript">
-    var resultTabPanel = new Ext.TabPanel({
-      activeTab:0,
-      items:[{
-        contentEl:'south',
-        title:'Search 1',
-        autoScroll:true,
-        closable:false
-      }]
-    });
-
     Ext.onReady(function(){
 
       Ext.state.Manager.setProvider(new Ext.state.CookieProvider());
@@ -36,12 +26,14 @@
           width:200,
           defaults: {
             // applied to each contained panel
-            bodyStyle:'margin:5px'
+            bodyStyle:'margin:0px'
           },
-          items:[{
-            title:'Map Layers',
-            contentEl:'mapLayerSwitcherPanel'
-          }]
+          items:[
+            { title:'Map Layers',
+            contentEl:'mapLayerSwitcherPanel' },
+            { title:'Search Distance',
+            contentEl:'searchControl' }
+          ]
         },{
           region:'south',
           title:'Search Results',
@@ -49,7 +41,16 @@
           split:false,
           height:150,
           margins:'0 0 0 0',
-          items:[	resultTabPanel ]
+          items:[
+            new Ext.TabPanel({
+              activeTab:0,
+              items:[{
+                contentEl:'south',
+                title:'Search 1',
+                autoScroll:true
+              }]
+            })
+          ]
         }]
       });
 
@@ -62,99 +63,30 @@
       });
 
     });
-
-		// get items from flickr
-		var flickrkey='FLICKR-KEY';
-		var furl = 'http://api.flickr.com/services/rest/?';
-		var fstore = new Array();
-
-		function getPhotosIn( olPtList ) {
-			var bbox = getBoundsFlickrString( olPtList );
-	
-			// todo: make date limit user adjustable
-			var dateLimit = new Date();
-			dateLimit.setFullYear( dateLimit.getFullYear() - 1 );
-
-			var url = furl;
-			var params = { method: 'flickr.photos.search',
-				format: 'json',
-				api_key: flickrkey,
-	    	bbox: bbox,	
-	    	min_taken_date: dateLimit.getFullYear() + 
-	                   '-' + (dateLimit.getMonth() + 1) +
-	                   '-' + dateLimit.getDate(),
-				page: 1,
-	    	per_page: 10,
-				jsoncallback: 'fSearchResponse' };
-
-			var req = new Ext.data.ScriptTagProxy({ url:url });
-
-			var scp = null;
-			var arg = null;
-			var callback = null;
-			var reader = null;
-			req.load( params, reader, callback, scp, arg ); 
-		}
-
-		function fSearchResponse( fRsp )
-		{
-			var data = fRsp.photos;
-			var success = fRsp.stat;
-
-			fstore.push( new Ext.data.JsonStore({
-				root:'photo',
-				id:'id',
-				fields:['owner','secret','server','farm','title','ispublic','isfriend','isfamily'],
-				data: data 
-			}));
-
-			renderResults( fstore[ fstore.length - 1 ] );
-		}
-
-		function renderResults( store )	{
-			var resultPanel = new Ext.Panel({
-				title:'Results',
-				html:'<p>Found ' + store.getCount() + ' photos there.</p>',
-				closable:true,
-				cls:'results'
-			});
-
-			var tab = resultTabPanel.getActiveTab();
-
-			resultTabPanel.add( resultPanel );
-			resultTabPanel.doLayout();
-			resultTabPanel.activate( resultPanel );
-
-			if ( tab.contentEl == 'south' )
-			{
-				resultTabPanel.remove( tab );
-				resultTabPanel.doLayout();
-			}
-		}
-
 	</script>
   <style type="text/css">
     div#mapLayerSwitcherPanel {
-      padding:5px 5px 5px 5px;
+      padding:3px;
     }
-		div.results {
-			height:150px;
-		}
+    div#searchControl {
+      padding:3px;
+    }
   </style>
 <!-- end ExtJS scripts -->
 
 <!-- OpenLayers scripts -->
   <script type="text/javascript" src="OpenLayers/OpenLayers.js"></script>
-	<script type="text/javascript" src="OpenLayers/Projection.js"></script>
-	<script type="text/javascript" src="proj4js/proj4js.js"></script>
-<!-- <script type="text/javascript" src="http://api.maps.yahoo.com/ajaxymap?v=3.7&appid=APP-ID"></script>
-  <script type="text/javascript" src="http://maps.google.com/maps?file=api&v=2.82&key=GMAP-KEY"></script> -->
+<!--
+  <script type="text/javascript" src="http://api.maps.yahoo.com/ajaxymap?v=3.7&appid=APP-ID"></script>
+  <script type="text/javascript" src="http://maps.google.com/maps?file=api&v=2.82&key=GMAP-KEY"></script>
+-->
   <script type="text/javascript">
-    var ol_map,ol_layers;
+    var ol_map,ol_layers,boxWidth=20;
+
     function ol_init(){
       var options = {
-        projection: new OpenLayers.Projection('EPSG:900913'),
-        displayProjection: new OpenLayers.Projection('EPSG:4326'),
+        projection: 'EPSG:900913',
+        displayProjection: 'EPSG:4326',
         units: 'm',
         maxResolution: 156543.0339,
         maxExtent: new OpenLayers.Bounds(-20037508, -20037508,
@@ -167,15 +99,15 @@
       ol_map.addControl(new OpenLayers.Control.MousePosition());
 
       ol_layers = {
-        //google: new OpenLayers.Layer.Google( 'Google', { type:G_NORMAL_MAP } ),
-        //yahoo: new OpenLayers.Layer.Yahoo( 'Yahoo' ),
+//        google: new OpenLayers.Layer.Google( 'Google', { type:G_NORMAL_MAP } ),
+//        yahoo: new OpenLayers.Layer.Yahoo( 'Yahoo' ),
         osm: new OpenLayers.Layer.TMS( 'OpenStreetMap', 'http://tile.openstreetmap.org/',
           { type: 'png', getURL: osm_getTileURL,
             displayOutsideMaxExtent: true,
             attribution: '<a href="http://www.openstreetmap.org/">OpenStreetMap</a>' }),
-        //ol: new OpenLayers.Layer.WMS( 'OpenLayers WMS', 
-        //    'http://labs.metacarta.com/wms/vmap0',
-        //    {layers: 'basic'}, {'displayInLayerSwitcher':true} ),
+        ol: new OpenLayers.Layer.WMS( 'OpenLayers WMS', 
+            'http://labs.metacarta.com/wms/vmap0',
+            {layers: 'basic'}, {'displayInLayerSwitcher':true} ),
         features: new OpenLayers.Layer.Vector('Bounding Boxes'),
         markers: new OpenLayers.Layer.Markers('Markers')
       };
@@ -185,8 +117,7 @@
         ol_map.addLayer( ol_layers[key] );
       }
 
-			// -75.16337,39.95234
-      ol_map.setCenter(new OpenLayers.LonLat(-8366872, 4856084), 12);
+      ol_map.setCenter(new OpenLayers.LonLat(-75.16337,39.95234), 12);
 
       ol_map.events.register('click', ol_map, focusRegion );
     }
@@ -214,66 +145,29 @@
       ol_map.setBaseLayer( ol_layers[ element.value ] );
     }
 
+    function changeRadius( element ) {
+      boxWidth = element.value * 2;
+    }
+
     function focusRegion(e) {
-      
-			var pointList = getRegionBounds( e.xy );
+      var lonlat = ol_map.getLonLatFromPixel(e.xy);
+      var bounds = ol_map.getExtent();
+
+      var sz = Math.min( bounds.getWidth(), bounds.getHeight() ) / boxWidth;
+
+      var pointList = [];
+      pointList.push( new OpenLayers.Geometry.Point( lonlat.lon - sz, lonlat.lat - sz ) );
+      pointList.push( new OpenLayers.Geometry.Point( lonlat.lon - sz, lonlat.lat + sz ) );
+      pointList.push( new OpenLayers.Geometry.Point( lonlat.lon + sz, lonlat.lat + sz ) );
+      pointList.push( new OpenLayers.Geometry.Point( lonlat.lon + sz, lonlat.lat - sz ) );
+      pointList.push( pointList[0] );
 
       var linearRing = new OpenLayers.Geometry.LinearRing( pointList );
       var polygonFeature = new OpenLayers.Feature.Vector(
                 new OpenLayers.Geometry.Polygon([linearRing]));
 
       ol_layers['features'].addFeatures([polygonFeature]);
-
-			getPhotosIn( pointList );
     }
-
-		function getRegionBounds( pixPt )
-		{
-			var minPt = new OpenLayers.Pixel();
-			minPt.x = pixPt.x - 20;
-			minPt.y = pixPt.y - 20;
-
-			var maxPt = new OpenLayers.Pixel();
-			maxPt.x = pixPt.x + 20;
-			maxPt.y = pixPt.y + 20;
-
-			var minLonlat = ol_map.getLonLatFromPixel(minPt);
-			var maxLonlat = ol_map.getLonLatFromPixel(maxPt);
-
-      var pointList = [];
-      pointList.push( new OpenLayers.Geometry.Point( minLonlat.lon, minLonlat.lat ) );
-      pointList.push( new OpenLayers.Geometry.Point( minLonlat.lon, maxLonlat.lat ) );
-      pointList.push( new OpenLayers.Geometry.Point( maxLonlat.lon, maxLonlat.lat ) );
-      pointList.push( new OpenLayers.Geometry.Point( maxLonlat.lon, minLonlat.lat ) );
-      pointList.push( pointList[0] );
-
-			return pointList;
-		}
-
-		function getBoundsFlickrString( olPtList )
-		{
-			var minx = olPtList[0].x;
-			var maxx = olPtList[0].x;
-			var miny = olPtList[0].y;
-			var maxy = olPtList[0].y;
-
-			for( var i = 0; i < olPtList.length; i++ )
-			{
-				minx = ( olPtList[i].x < minx ) ? olPtList[i].x : minx;
-				maxx = ( olPtList[i].x > maxx ) ? olPtList[i].x : maxx;
-				miny = ( olPtList[i].y < miny ) ? olPtList[i].y : miny;
-				maxy = ( olPtList[i].y > maxy ) ? olPtList[i].y : maxy;
-			}
-
-			var orig = { x: minx, y: miny };
-			var minDest = OpenLayers.Projection.transform( orig, ol_map.projection,
-				ol_map.displayProjection );
-			orig = { x: maxx, y: maxy };
-			var maxDest = OpenLayers.Projection.transform( orig, ol_map.projection,
-				ol_map.displayProjection );
-
-			return minDest.x + ',' + minDest.y + ',' + maxDest.x + ',' + maxDest.y;
-		}
 
     window.onload = ol_init;
   </script>
@@ -292,13 +186,20 @@
   </div>
   <div id="mapLayerSwitcherPanel">
     <ul>
-      <!-- <li><input type="radio" name="olLayerName" value="google" onclick="changeLayer(this);"/>Google</li>
-      <li><input type="radio" name="olLayerName" value="yahoo" onclick="changeLayer(this);"/>Yahoo</li> -->
-      <li><input type="radio" name="olLayerName" value="osm" onclick="changeLayer(this);" checked />OpenStreetMap</li>
-      <!-- <li><input type="radio" name="olLayerName" value="ol" onclick="changeLayer(this);"/>OpenLayers</li> -->
+      <!-- <li><input type="radio" name="olLayerName" value="google" onclick="changeLayer(this);"/>Google</li> -->
+      <!-- <li><input type="radio" name="olLayerName" value="yahoo" onclick="changeLayer(this);"/>Yahoo</li> -->
+      <li><input type="radio" name="olLayerName" value="osm" onclick="changeLayer(this);" checked="checked"/>OpenStreetMap</li>
+      <li><input type="radio" name="olLayerName" value="ol" onclick="changeLayer(this);"/>OpenLayers</li>
     </ul>
   </div>
-  <div id="south" class="results">
+  <div id="searchControl">
+    <ul>
+      <li><input type="radio" name="searchRadius" value="20" onclick="changeRadius(this);" /> Small</li>
+      <li><input type="radio" name="searchRadius" value="10" checked="checked" onclick="changeRadius(this);" /> Medium</li>
+      <li><input type="radio" name="searchRadius" value="5" onclick="changeRadius(this);" /> Large</li>
+    </ul>
+  </div>
+  <div id="south">
     <p>This is south content.</p>
   </div>
  </body>
