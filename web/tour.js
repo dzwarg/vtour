@@ -125,6 +125,10 @@ function TourPoint( lat, lon )
   this.Marker = null;
   this.Coord = null;
   this.PhotoPanel = null;
+  this.DateLimit = new Date();
+  this.DateLimit.setFullYear( this.DateLimit.getFullYear() - 1 );
+  this.ResultsPage = 1;
+  this.SearchUrl = '';
 
   if ( lat && lon )
   {
@@ -156,10 +160,17 @@ TourPoint.prototype.fetchPhotos = function( map, waitingRef )
   var bbox = this.computeBounds( map );
 
   var url = 'http://www.zwarg.com/cgi-bin/pxy.cgi?';
-  var params = 'method=flickr.photos.search&format=json&api_key=';
-  params += flickrkey+'&bbox='+bbox+'&min_taken_date=2007-1-1&per_page=10';
-  params += '&nojsoncallback=1';
-  url += escape( params );
+  var params = 'method=flickr.photos.search' +
+    '&format=json' +
+    '&api_key=' + flickrkey +
+    '&bbox=' + bbox +
+    '&min_taken_date=' + this.DateLimit.getFullYear() + 
+                   '-' + (this.DateLimit.getMonth() + 1) +
+                   '-' + this.DateLimit.getDate() +
+    '&page=' + this.ResultsPage +
+    '&per_page=10' +
+    '&nojsoncallback=1';
+  this.SearchUrl = url + escape( params );
 
   var xmlReq = getXmlRequest();
 
@@ -180,7 +191,7 @@ TourPoint.prototype.fetchPhotos = function( map, waitingRef )
       }
     }
   };
-  xmlReq.open('GET',url,true);
+  xmlReq.open('GET',this.SearchUrl,true);
   xmlReq.send(null);
 };
 
@@ -233,16 +244,7 @@ TourPoint.prototype.fetchPhotosCallback = function( me, rsp )
 
   photoDiv.appendChild( end );
 
-  var moreInfo = document.createElement('div');
-  moreInfo.className = 'smallText';
-  var from = ((rsp.photos.page-1)*rsp.photos.perpage)+1;
-  var to = (rsp.photos.page-1)*rsp.photos.perpage+rsp.photos.perpage;
-  to = ( rsp.photos.total < to ) ? rsp.photos.total : to;
-  var moreInfoStr = 'Photos found: ' + rsp.photos.total + ' :: Showing photos ';
-  moreInfoStr += from.toString() + ' to ' + to.toString();
-  moreInfo.appendChild( document.createTextNode(moreInfoStr) );
-
-  photoDiv.appendChild( moreInfo );
+  photoDiv.appendChild( me.CreateMoreInfoString( rsp ) );
 
   me.PhotoPanel = photoDiv;
 
@@ -250,6 +252,39 @@ TourPoint.prototype.fetchPhotosCallback = function( me, rsp )
 
   me.ShowLastPhotoPanel( photosDiv );
   me.UpdatePhotoPaging( photosDiv );
+};
+
+TourPoint.prototype.CreateMoreInfoString = function( rsp )
+{
+  var from = ((rsp.photos.page-1)*rsp.photos.perpage)+1;
+  var to = (rsp.photos.page-1)*rsp.photos.perpage+rsp.photos.perpage;
+  to = ( rsp.photos.total < to ) ? rsp.photos.total : to;
+
+  var info = document.createElement('div');
+  info.className = 'smalltext';
+
+  if ( from > 1 )
+  {
+    var prev = document.createElement('span');
+    prev.className = 'resultButton';
+    prev.onclick = function(){ alert('previous photos,please'); };
+    prev.appendChild( document.createTextNode('\u00ab') );
+    info.appendChild( prev );
+  }
+
+  var infoStr = from.toString() + ' to ' + to.toString() + ' of ' + rsp.photos.total;
+  info.appendChild( document.createTextNode( infoStr ) );
+
+  if ( to < rsp.photos.total )
+  {
+    var next = document.createElement('span');
+    next.className = 'resultButton';
+    next.onclick = function(){ alert('next photos,please'); };
+    next.appendChild( document.createTextNode('\u00bb') );
+    info.appendChild( next );
+  }
+
+  return info;
 };
 
 TourPoint.prototype.ShowLastPhotoPanel = function( div )

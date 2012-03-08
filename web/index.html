@@ -7,24 +7,19 @@
 <script type="text/javascript" src="tour.js"></script>
 <script type="text/javascript" src="script.js"></script>
 </head>
-<body onload="setup();">
+<body onload="setup();" class="gradient">
 
 <div class="banner">
   <h1>Oh, The Places You Will Go</h1>
 </div>
 
 <div class="search">
-  <input type="text" name="place" id="place" onkeypress="placeInputEvent(event);" />
+  <input type="text" name="place" id="place" onkeypress="placeInputEvent(event);" class="gradient"/>
   <input type="button" value="Find" onclick="findPlace();" />
 </div>
 
 <div id="mapExt">
   <div id="map"></div>
-</div>
-
-<div class="actionpanel">
-  <!--<input class="actionbutton" type="button" value="What Will I See?" onclick="clearTourPhotos();getTourPhotos();"/>-->
-  <input class="actionbutton" type="button" value="Start Over" onclick="clearTour();"/>
 </div>
 
 <div id="lightslide">
@@ -43,6 +38,11 @@
 <div id="pager">
   <span id="pagerNow">0</span> / <span id="pagerTotal">0</span>
   <span id="waiting"><img src="progress.gif"/></span>
+</div>
+
+<div class="actionpanel">
+  <!--<input class="actionbutton" type="button" value="What Will I See?" onclick="clearTourPhotos();getTourPhotos();"/>-->
+  <input class="actionbutton" type="button" value="Start Over" onclick="clearTour();"/>
 </div>
 
 <div id="debug">

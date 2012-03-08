@@ -10,6 +10,7 @@ var map;
 // Create an array of tour pts
 var tour = new Tour();
 var mapEvt = null;
+var waitQueue = new Array();
 
 function setup()
 {
@@ -44,6 +45,8 @@ function setup()
     }
     mapEvt = null;
   });
+
+  document.getElementById('place').focus();
 }
 
 // mouse click capture function
@@ -71,7 +74,7 @@ function markPt(_e, _c){
 
   map.addOverlay( myPoint.Marker );
 
-  myPoint.fetchPhotos( map );
+  myPoint.fetchPhotos( map, waiting );
 }
 
 function enumerateProperties ( obj )
@@ -309,8 +312,17 @@ function getXmlRequest()
 
 function waiting( state )
 {
+  if ( state )
+  {
+    waitQueue.push(state);
+  }
+  else
+  {
+    waitQueue.pop();
+  }
+
   var waitdiv = document.getElementById('waiting');
-  waitdiv.style.display = (state) ? 'block' : 'none';
+  waitdiv.style.display = (waitQueue.length > 0) ? 'block' : 'none';
 }
 
 function getImageInfo()
@@ -382,6 +394,15 @@ function createCameraIcon()
   myImage.size = new YSize(16,16);
   myImage.offsetSmartWindow = new YCoordPoint(3,1);
   return myImage;
+}
+
+function placeInputEvent(event)
+{
+  if( event.keyCode == event.DOM_VK_ENTER ||
+      event.keyCode == event.DOM_VK_RETURN )
+  {
+    findPlace();
+  }
 }
 
 function findPlace()

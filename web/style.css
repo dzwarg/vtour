@@ -125,3 +125,7 @@ h1
   top:0.5em;
   right:1em;
 }
+.smallText
+{
+  font-size:9pt;
+}
