@@ -32,17 +32,19 @@ h1.pagetitle
   height: 35em;
   width: auto;
 }
-#help {
+div#help {
   position:absolute;
   right:4em;
   width:20em;
   top:4em;
   height:30em;
   background-color:#ffffcc;
-  padding:0.5em;
   opacity:0.85;
-  overflow:scroll;
   border:solid 1px #cccccc;
+  overflow:scroll;
+}
+div#helpInt {
+  padding:0.5em;
 }
 #help p {
   font-size:80%;
@@ -132,7 +134,10 @@ h1.pagetitle
   border:solid 1px #cccccc;
 }
 div#close {
-  float:right;
+  text-align:right;
+  background-color:#9999cc;
+  padding:2px;
+  height:16px;
 }
 .photoItem
 {

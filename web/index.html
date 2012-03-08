@@ -3,15 +3,276 @@
   <title>vTour</title>
 
   <!-- ExtJS scripts -->
-	<link rel="stylesheet" type="text/css" href="ext-2.0/resources/css/ext-all.css" />
+  <link rel="stylesheet" type="text/css" href="ext-2.0/resources/css/ext-all.css" />
  	<link rel="stylesheet" type="text/css" href="ext-2.0/resources/css/xtheme-gray.css" />
  	<script type="text/javascript" src="ext-2.0/adapter/ext/ext-base.js"></script>
-  <script type="text/javascript" src="ext-2.0/ext-all.js"></script>
-	<script type="text/javascript">
+  <script type="text/javascript" src="ext-2.0/ext-all-debug.js"></script>
+  <script type="text/javascript">
+    var vtour = {};
+    vtour.flickrkey='FLICKR-KEY';
+
     Ext.onReady(function(){
 
-      Ext.state.Manager.setProvider(new Ext.state.CookieProvider());
-        
+      var state = new Ext.state.CookieProvider();
+      Ext.state.Manager.setProvider( state );
+      
+      var welcomeTemplate = new Ext.Template( 'Welcome, {0}' );
+
+      var loggedInPanel = new Ext.FormPanel({
+        title:'My Account',
+        collapsible:true,
+        contentEl:'loggedInPanel',
+        collapsed: false,
+        border: false,
+        items: [
+          new Ext.Panel({
+            id: 'welcomePanel',
+            border:false,
+            html: '',
+            style: 'margin:0px 0px 5px 0px; padding: 2px;'
+          })
+        ]
+      });
+      
+      var loginPanel = new Ext.FormPanel({
+        title:'Sign In',
+        collapsible:true,
+        contentEl:'loginPanel',
+        collapsed: false,
+        border: false,
+        defaultType: 'textfield',
+        labelWidth: 63,
+        labelAlign: 'right',
+        items: [
+          new Ext.Panel({
+            border: false,
+            html: 'Sign in, or register to start saving your tours.',
+            style: 'margin:0px 0px 5px 0px; padding: 2px;'
+          }),
+          {
+            fieldLabel: 'Login',
+            name: 'user',
+            width: 125,
+            vtype: 'alphanum',
+            allowBlank: false
+          }, {
+            inputType:'password',
+            fieldLabel: 'Password',
+            name: 'password',
+            width: 125,
+            allowBlank: false
+          }
+        ],
+        method: 'GET',
+        url: '/~davidz/users/login'
+      });
+
+      loginPanel.addButton({
+        text: 'Sign In',
+        handler: function() {
+          var frm = loginPanel.getForm();
+          if ( frm.isValid() ) {
+            frm.submit({
+              waitMsg:'Logging in...',
+              failure: function( form, action ) {
+                if ( action.result.message != 'ok' ) {
+                  Ext.MessageBox.alert( 'Oops!', action.result.message );
+                  return;
+                }
+                
+                loginPanel.hide();
+                loginPanel.getForm().reset();
+                loggedInPanel.show();
+                
+                // save auth cookie
+                state.set( 'vtour_secret', action.result.secret );
+                state.set( 'vtour_user', action.result.user.login );
+                
+                Ext.get('welcomePanel').update( welcomeTemplate.apply( [action.result.user.login] ) );
+              }
+            });
+          }
+        }
+      });
+      
+      var registerWin;
+
+      loginPanel.addButton({
+        text: 'Register',
+        handler: function() {
+          if ( !registerWin ) {
+            var registerForm = new Ext.FormPanel({
+              border: false,
+              collapsible: false,
+              bodyStyle:'padding:2px 2px 2px 2px;',
+              method:'POST',
+              url:'/~davidz/users/register',
+              items: [
+                new Ext.form.FieldSet({
+                  title: 'Pick a login',
+                  labelAlign: 'right',
+                  labelWidth: 63,
+                  height: 53,
+                  defaultType: 'textfield',
+                  items: [{
+                    fieldLabel: 'Login', 
+                    name: 'user', 
+                    width: 125,
+                    vtype: 'alphanum',
+                    allowBlank: false                    
+                  }]
+                }),
+                new Ext.form.FieldSet({
+                  title: 'Pick a good password',
+                  labelAlign: 'right',
+                  labelWidth: 63,
+                  height: 80,
+                  defaultType: 'textfield',
+                  items:[{ 
+                    fieldLabel: 'Password', 
+                    name: 'password', 
+                    width: 125,
+                    inputType: 'password',
+                    allowBlank: false
+                  },{ 
+                    fieldLabel: 'Verify', 
+                    name: 'password2', 
+                    width: 125,
+                    inputType: 'password',
+                    allowBlank: false
+                  }]
+                }),
+                new Ext.form.FieldSet({
+                  title: 'Finally, your email address',
+                  labelAlign: 'right',
+                  labelWidth: 63,
+                  height: 80,
+                  defaultType: 'textfield',
+                  items: [{
+                    fieldLabel: 'Email', 
+                    name: 'email', 
+                    width: 125,
+                    vtype: 'email',
+                    allowBlank: false
+                  },{ 
+                    fieldLabel: 'Verify', 
+                    name: 'email2', 
+                    width: 125,
+                    vtype: 'email',
+                    allowBlank: false
+                  }]
+                })
+              ]
+            });
+            
+            registerWin = new Ext.Window({
+              title: 'Register an account',
+              modal: true,
+              closeAction: 'hide',
+              items:[
+                registerForm
+              ],
+              buttons: [
+                new Ext.Button({ 
+                  text: 'Register',
+                  handler: function() {
+                    var frm = registerForm.getForm();
+                    if ( frm.findField('password').el.getValue() != frm.findField('password2').el.getValue() ) {
+                      frm.markInvalid([{
+                        id: 'password',
+                        msg: 'Passwords must match.'
+                      },{
+                        id: 'password2',
+                        msg: 'Passwords must match.'
+                      }]);
+                      return;
+                    }
+                    if (frm.findField('email').el.getValue() != frm.findField('email2').el.getValue() ) {
+                      frm.markInvalid([{
+                        id: 'email',
+                        msg: 'Email addresses must match.'
+                      },{
+                        id: 'email2',
+                        msg: 'Email addresses must match.'
+                      }]);
+                      return;                      
+                    }
+                    if ( frm.isValid() ) {
+                      frm.submit({
+                        waitMsg:'Registering...',
+                        failure: function( form, action ) {
+                          if ( action.result.message != 'ok' ) {
+                            if ( action.result.message == 'A user with that name already exists.' ) {
+                              registerForm.getForm().markInvalid( [{
+                                id:'user',
+                                msg: action.result.message
+                              }] );
+                            }
+                            else
+                              Ext.MessageBox.alert( 'Oops!', action.result.message );
+                          }
+                          else {
+                            registerForm.getForm().reset();
+                            registerWin.hide();
+                          }
+                        }
+                      });
+                    }
+                  }
+                }),
+                new Ext.Button({
+                  text: 'Cancel',
+                  handler: function() {
+                    registerForm.getForm().reset();
+                    registerWin.hide();
+                  }
+                })
+              ]
+            });
+          }
+
+          registerWin.show();
+        }
+      });
+
+      loggedInPanel.addButton({
+        text: 'Sign Out',
+        handler: function() {
+          // clear cookies
+          state.clear( 'vtour_secret' );
+          state.clear( 'vtour_user' );
+                        
+          loggedInPanel.hide();
+          loginPanel.show();
+        }        
+      });
+      
+      var eastPanel = new Ext.Panel({
+        region:'east',
+        id:'eastPanel',
+        width:200,
+        defaults: {
+          // applied to each contained panel
+          bodyStyle:'margin:0px'
+        },
+        items:[
+          { title:'Map Layers',
+            contentEl:'mapLayerSwitcherPanel',
+            collapsible: true,
+            collapsed: false,
+            border: false },
+          loginPanel,
+          loggedInPanel,
+          {
+            title:'Search Distance',
+            collapsible: true,
+            contentEl:'searchPanel',
+            collapsed: true,
+            border: false
+          }
+        ]
+      });
+
       // setup the viewport
       var viewport = new Ext.Viewport({
         layout:'border',
@@ -19,40 +280,56 @@
           region:'center',
           deferredRender:false,
           contentEl:'center',
-          margins:'0 0 0 0'
-        },{
-          region:'east',
-          layout:'accordion',
-          width:200,
-          defaults: {
-            // applied to each contained panel
-            bodyStyle:'margin:0px'
-          },
-          items:[
-            { title:'Map Layers',
-            contentEl:'mapLayerSwitcherPanel' },
-            { title:'Search Distance',
-            contentEl:'searchControl' }
-          ]
-        },{
+          margins:'0 0 0 0',
+          border: false
+        },
+        eastPanel,{
           region:'south',
-          title:'Search Results',
+          id:'searchPanelDiv',
           collapsible:false,
           split:false,
           height:150,
           margins:'0 0 0 0',
+          border: false,
           items:[
             new Ext.TabPanel({
-              activeTab:0,
-              items:[{
-                contentEl:'south',
-                title:'Search 1',
-                autoScroll:true
-              }]
+              id:'resultTabs',
+              visible: false,
+              height: 150,
+              border: false,
+              activeTab: 0,
+              enableTabScroll: true,
+              defaults: { 
+                autoScroll: true, 
+                closable: true
+              },
+              items: [ { 
+                title: 'Instructions', 
+                contentEl: 'south',
+                closable: false
+              } ],
+              listeners: {
+                'beforeremove': function( me, child ){
+                  var i = me.items.findIndex( 'id', child.id );
+                  if( i > 0 ) {
+                    vtour.ol_layers['features'].removeFeatures(
+                      vtour.ol_layers['features'].features.slice( i-1, i )
+                    );
+                  }
+                }
+              }
             })
           ]
         }]
       });
+      
+      // hide the logged-in status until after logging in
+      if ( state.get( 'vtour_user', '' ) == '' ) {
+        loggedInPanel.hide();
+      }
+      else {
+        loginPanel.hide();
+      }
 
       viewport.on( {
         'resize': function( obj, adjWidth, adjHeight, rawWidth, rawHeight ){ 
@@ -61,99 +338,147 @@
           }
         }
       });
+      
+      // create the script tag proxy for loading the results.  all flickr photo
+      // searches will use this same proxy object
+      vtour.pxy = new Ext.data.ScriptTagProxy({
+        callbackParam: 'jsoncallback',
+        url: 'http://api.flickr.com/services/rest/'
+      });
+      
+      vtour.pxy.on( 'load', function( aPxy, data, meta) {
+        meta.total = data.photos.total;
+        meta.page = data.photos.page;
+        meta.pages = data.photos.pages;
+        meta.perpage = data.photos.perpage;
+      } );
+      
+      vtour.photoReader = new Ext.data.JsonReader(
+        {
+          successProperty: 'stat',
+          totalProperty: 'total',
+          root: 'photos.photo',
+          id: 'id'
+        }, 
+        Ext.data.Record.create([
+          {name: 'owner'},
+          {name: 'secret'},
+          {name: 'server'},
+          {name: 'farm'},
+          {name: 'title'},
+          {name: 'ispublic'},
+          {name: 'isfriend'},
+          {name: 'isfamily'}
+        ])
+      );
+      
+      //var baseURL = 'http://farm' + photo.farm + '.static.flickr.com/' +
+      //photo.server + '/' + photo.id + '_' + photo.secret;
+      
+      vtour.searchResultTemplate = new Ext.XTemplate( 
+        '<div class="photoListPanel"><div>{[this.getStart(values.meta)]} to ',
+        '{[this.getEnd(values.meta)]}<br/>of<br/>',
+        '{[this.getTotal(values.meta)]} photos</div>',
+        '<ul><tpl for="records">',
+        '<div><img src="{[this.getUrl(values.id,values.data)]}" ',
+        'alt="{[this.getTitle(values.data)]}" title="{[this.getTitle(values.data)]}"></div>',
+        '</tpl></ul></div>',
+        {
+          getTotal: function( meta ) { return meta.total; },
+          getStart: function( meta ) { return ((meta.page - 1) * meta.perpage) + 1; },
+          getEnd: function( meta ) { return meta.page * meta.perpage; },
+          getUrl: function( id, data ) { return 'http://farm' + data.farm + '.static.flickr.com/'
+            + data.server + '/' + id + '_' + data.secret + '_s.jpg'; },
+          getTitle: function( data ) { return data.title; }
+        }
+      );
 
+      setTimeout( ol_init, 1 );
     });
 	</script>
   <style type="text/css">
     div#mapLayerSwitcherPanel {
-      padding:3px;
+      padding:2px;
     }
     div#searchControl {
-      padding:3px;
+      padding:2px;
+    }
+    div#south {
+      padding-top: 2em;
+      text-align: center;
+      font-size: 1.5em;
+    }
+    div.photoListPanel{
+      
+    }
+    div.photoListPanel div {
+      float:left;
+      text-align:center;
+      width: 77px;
+      height: 77px;
+      font-size:0.8em;
+      border-right: 1px solid #ddd;
+      border-bottom: 1px solid #ccc;
     }
   </style>
 <!-- end ExtJS scripts -->
 
 <!-- OpenLayers scripts -->
-  <script type="text/javascript" src="OpenLayers/OpenLayers.js"></script>
-<!--
+  <script type="text/javascript" src="OpenLayers-2.6/lib/OpenLayers.js"></script>
+  <script type="text/javascript" src="OpenLayers-2.6/lib/Proj4js/proj4js.js"></script>
   <script type="text/javascript" src="http://api.maps.yahoo.com/ajaxymap?v=3.7&appid=APP-ID"></script>
   <script type="text/javascript" src="http://maps.google.com/maps?file=api&v=2.82&key=GMAP-KEY"></script>
--->
   <script type="text/javascript">
-    var ol_map,ol_layers,boxWidth=20;
-
     function ol_init(){
+      Proj4js.libPath = 'OpenLayers-2.6/lib/Proj4js/';
       var options = {
-        projection: 'EPSG:900913',
-        displayProjection: 'EPSG:4326',
+        projection: new OpenLayers.Projection('EPSG:900913'),
+        displayProjection: new OpenLayers.Projection('EPSG:4326'),
         units: 'm',
         maxResolution: 156543.0339,
-        maxExtent: new OpenLayers.Bounds(-20037508, -20037508,
-                                          20037508, 20037508.34)
+        maxExtent: new OpenLayers.Bounds( -20037508, -20037508, 20037508, 20037508.34 )
       };
 
-      ol_map = new OpenLayers.Map('mapDiv', options);
+      vtour.boxWidth = 20;
+      vtour.ol_map = new OpenLayers.Map('mapDiv', options);
 
-      ol_map.addControl(new OpenLayers.Control.KeyboardDefaults());
-      ol_map.addControl(new OpenLayers.Control.MousePosition());
+      vtour.ol_map.addControl(new OpenLayers.Control.KeyboardDefaults());
+      vtour.ol_map.addControl(new OpenLayers.Control.MousePosition());
 
-      ol_layers = {
-//        google: new OpenLayers.Layer.Google( 'Google', { type:G_NORMAL_MAP } ),
-//        yahoo: new OpenLayers.Layer.Yahoo( 'Yahoo' ),
-        osm: new OpenLayers.Layer.TMS( 'OpenStreetMap', 'http://tile.openstreetmap.org/',
-          { type: 'png', getURL: osm_getTileURL,
-            displayOutsideMaxExtent: true,
-            attribution: '<a href="http://www.openstreetmap.org/">OpenStreetMap</a>' }),
-        ol: new OpenLayers.Layer.WMS( 'OpenLayers WMS', 
-            'http://labs.metacarta.com/wms/vmap0',
-            {layers: 'basic'}, {'displayInLayerSwitcher':true} ),
+      vtour.ol_layers = {
+        yahoo: new OpenLayers.Layer.Yahoo( "Yahoo", { sphericalMercator: true } ),
+        google: new OpenLayers.Layer.Google( "Google", { sphericalMercator: true } ),
         features: new OpenLayers.Layer.Vector('Bounding Boxes'),
         markers: new OpenLayers.Layer.Markers('Markers')
       };
 
-      for ( var key in ol_layers )
+      for ( var key in vtour.ol_layers )
       {
-        ol_map.addLayer( ol_layers[key] );
+        vtour.ol_map.addLayer( vtour.ol_layers[key] );
       }
 
-      ol_map.setCenter(new OpenLayers.LonLat(-75.16337,39.95234), 12);
+      vtour.ol_map.setCenter(new OpenLayers.LonLat(-8367155.413500762,4859078.000840925), 12);
 
-      ol_map.events.register('click', ol_map, focusRegion );
-    }
-
-    function osm_getTileURL(bounds) {
-      var res = this.map.getResolution();
-      var x = Math.round((bounds.left - this.maxExtent.left) / (res * this.tileSize.w));
-      var y = Math.round((this.maxExtent.top - bounds.top) / (res * this.tileSize.h));
-      var z = this.map.getZoom();
-      var limit = Math.pow(2, z);
-
-      if (y < 0 || y >= limit) {
-        return OpenLayers.Util.getImagesLocation() + "404.png";
-      } else {
-        x = ((x % limit) + limit) % limit;
-        return this.url + z + "/" + x + "/" + y + "." + this.type;
-      }
+      vtour.ol_map.events.register('click', vtour.ol_map, focusRegion );
     }
 
     function ol_resize() {
-      ol_map.updateSize();
+      vtour.ol_map.updateSize();
     }
 
     function changeLayer( element ) {
-      ol_map.setBaseLayer( ol_layers[ element.value ] );
+      vtour.ol_map.setBaseLayer( vtour.ol_layers[ element.value ] );
     }
 
     function changeRadius( element ) {
-      boxWidth = element.value * 2;
+      vtour.boxWidth = element.value * 2;
     }
 
     function focusRegion(e) {
-      var lonlat = ol_map.getLonLatFromPixel(e.xy);
-      var bounds = ol_map.getExtent();
+      var lonlat = vtour.ol_map.getLonLatFromPixel(e.xy);
+      var bounds = vtour.ol_map.getExtent();
 
-      var sz = Math.min( bounds.getWidth(), bounds.getHeight() ) / boxWidth;
+      var sz = Math.min( bounds.getWidth(), bounds.getHeight() ) / vtour.boxWidth;
 
       var pointList = [];
       pointList.push( new OpenLayers.Geometry.Point( lonlat.lon - sz, lonlat.lat - sz ) );
@@ -161,15 +486,89 @@
       pointList.push( new OpenLayers.Geometry.Point( lonlat.lon + sz, lonlat.lat + sz ) );
       pointList.push( new OpenLayers.Geometry.Point( lonlat.lon + sz, lonlat.lat - sz ) );
       pointList.push( pointList[0] );
-
+      
       var linearRing = new OpenLayers.Geometry.LinearRing( pointList );
       var polygonFeature = new OpenLayers.Feature.Vector(
-                new OpenLayers.Geometry.Polygon([linearRing]));
+        new OpenLayers.Geometry.Polygon([linearRing]), null, {
+          fillColor: '#fff',
+          fillOpacity: 0.2,
+          strokeColor: '#333',
+          strokeOpacity: 0.5,
+          strokeWidth: 1,
+          strokeLinecap: 'round'
+        });
 
-      ol_layers['features'].addFeatures([polygonFeature]);
+      vtour.ol_layers['features'].addFeatures([polygonFeature]);
+
+      // show results
+      var results = Ext.getCmp('resultTabs');
+
+      var oneSearchPanel = new Ext.Panel({
+        title:'Search '+(results.items.length),
+        listeners: {
+          /* this activate function is eye candy */
+          'activate': function(p) {
+            var layer = vtour.ol_layers['features'];
+            var index = results.items.findIndex( 'id', p.id );
+            var feature = (layer.features.slice( index-1, index ))[0];
+            new OpenLayers.Tween().start( 
+              { t: 255 }, 
+              { t: 0 }, 
+              100, 
+              {
+                callbacks: {
+                  eachStep: function( val ){ 
+                    feature.style.fillOpacity = 0.2 + (val['t'] / 255) * 0.8; 
+                    layer.redraw();
+                  }
+                }
+              }
+            ); // end tween.start
+          } 
+        }
+      }); // end ext.panel
+              
+      results.add( oneSearchPanel ).show();
+      
+      var ptMin = Proj4js.transform( 
+        vtour.ol_map.projection.proj, 
+        vtour.ol_map.displayProjection.proj, 
+        { x: lonlat.lon - sz, y: lonlat.lat - sz } );
+      var ptMax = Proj4js.transform(
+        vtour.ol_map.projection.proj,
+        vtour.ol_map.displayProjection.proj,
+        { x: lonlat.lon + sz, y: lonlat.lat + sz } );
+      
+      var bbox = ptMin.x.toString() + ',' + ptMin.y.toString() + ',' +
+        ptMax.x.toString() + ',' + ptMax.y.toString();
+        
+      getFlickrPhotos(bbox, oneSearchPanel );
     }
-
-    window.onload = ol_init;
+    
+    function getFlickrPhotos( bbox, panel ) {
+      vtour.pxy.load({
+          method: 'flickr.photos.search',
+          format: 'json',
+          api_key: vtour.flickrkey,
+          bbox: bbox,
+          min_taken_date: '2008-01-01',
+          page: 1,
+          per_page: 10
+        },
+        vtour.photoReader,
+        function( recordBlock, meta, success ){
+          if ( success ) {
+            recordBlock.meta = meta;
+            vtour.searchResultTemplate.overwrite( panel.body, recordBlock );
+          }
+          else {
+            Ext.MessageBox.alert( 'Could not get photos for that place.' );
+          }
+        },
+        this,
+        {}
+      );
+    }
   </script>
   <style type="text/css">
     div#mapDiv {
@@ -184,15 +583,15 @@
     <div id="mapDiv">
     </div>
   </div>
-  <div id="mapLayerSwitcherPanel">
+  <div id="mapLayerSwitcherPanel" class="x-hidden">
     <ul>
-      <!-- <li><input type="radio" name="olLayerName" value="google" onclick="changeLayer(this);"/>Google</li> -->
-      <!-- <li><input type="radio" name="olLayerName" value="yahoo" onclick="changeLayer(this);"/>Yahoo</li> -->
-      <li><input type="radio" name="olLayerName" value="osm" onclick="changeLayer(this);" checked="checked"/>OpenStreetMap</li>
-      <li><input type="radio" name="olLayerName" value="ol" onclick="changeLayer(this);"/>OpenLayers</li>
+      <li><input type="radio" name="olLayerName" value="yahoo" onclick="changeLayer(this);" checked="checked"/>Yahoo</li>
+      <li><input type="radio" name="olLayerName" value="google" onclick="changeLayer(this);"/>Google</li>
     </ul>
   </div>
-  <div id="searchControl">
+  <div id="loginPanel" class="x-hidden" style="padding:2px;"></div>
+  <div id="loggedInPanel" class="x-hidden" style="padding:2px"></div>
+  <div id="searchPanel" class="x-hidden" style="padding:2px;">
     <ul>
       <li><input type="radio" name="searchRadius" value="20" onclick="changeRadius(this);" /> Small</li>
       <li><input type="radio" name="searchRadius" value="10" checked="checked" onclick="changeRadius(this);" /> Medium</li>
@@ -200,7 +599,7 @@
     </ul>
   </div>
   <div id="south">
-    <p>This is south content.</p>
+    <p>Click on the map to search for photos.</p>
   </div>
  </body>
 </html>
