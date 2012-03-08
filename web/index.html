@@ -7,15 +7,18 @@
   <link rel="stylesheet" type="text/css" href="ext-2.0.2/resources/css/xtheme-gray.css" />
   <script type="text/javascript" src="ext-2.0.2/adapter/ext/ext-base.js"></script>
   <script type="text/javascript" src="ext-2.0.2/ext-all.js"></script>
-  <script type="text/javascript" src="FlickrPagingToolbar.js"></script>
-  <script type="text/javascript" src="PanoramioPagingToolbar.js"></script>
+  <script type="text/javascript" src="FlickrAdapter.js"></script>
+  <script type="text/javascript" src="PanoramioAdapter.js"></script>
+  <!-- <script type="text/javascript" src="PicasaAdapter.js"></script> -->
   <script type="text/javascript" src="json2.js"></script>
   <script type="text/javascript">
     Ext.BLANK_IMAGE_URL = 's.gif';
-    var vtour = {
-      flickrkey:'FLICKR-KEY',
-      fsurl:'http://www.spondubone.net/fs/featureserver.cgi'
-    }
+    vtour.fsurl = 'http://www.spondubone.net/fs/featureserver.cgi';
+    vtour.adapters = {
+      flickr: new vtour.FlickrAdapter(),
+      panoramio: new vtour.PanoramioAdapter()/*,
+      picasa: new vtour.PicasaAdapter()*/
+    };
 
     Ext.onReady(function(){
 
@@ -591,6 +594,22 @@
 	  fieldLabel: 'Tags'
 	}]
       });
+
+      var markup = [];
+
+      for ( var sk in vtour.adapters ) {
+        markup.push( vtour.adapters[sk].getSelector( markup.length == 0 ) );
+      }
+
+      markup = Ext.DomHelper.markup({ tag: 'ul', children: markup });
+
+      var svcPanel = new Ext.Panel({
+        title:'Search Service',
+        id:'servicePanel',
+        html: markup,
+        collapsed: true,
+        bodyStyle: 'margin:0px;padding:2px;'
+      });
       
       var eastPanel = new Ext.Panel({
         region:'east',
@@ -606,10 +625,7 @@
             contentEl:'mapLayerSwitcherPanel',
             collapsed: false,
             bodyStyle: 'margin:0px;' },
-          { title:'Search Service',
-            contentEl:'servicePanel',
-            collapsed: true,
-            bodyStyle: 'margin:0px;' },
+          svcPanel,
           placeSearchPanel,
           loginPanel,
           loggedInPanel,
@@ -1052,388 +1068,87 @@
           vtour.showDetail( feature );
         }
       }); 
-      
-      // create the script tag proxy for loading the results.  all flickr photo
-      // searches will use this same proxy object
-      vtour.pxy = {
-        flickr: new Ext.data.ScriptTagProxy({
-          callbackParam: 'jsoncallback',
-          url: 'http://api.flickr.com/services/rest/'
-        }),
-        panoramio: new Ext.data.ScriptTagProxy({
-          callbackParam: 'callback',
-          url: 'http://www.panoramio.com/map/get_panoramas.php'
-        })
-      };
-      
-      vtour.photoReader = {
-        flickr: new Ext.data.JsonReader(
-          {
-            successProperty: 'stat',
-            totalProperty: 'photos.total',
-            root: 'photos.photo',
-            id: 'id'
-          }, 
-          Ext.data.Record.create([
-            {name: 'id'},
-            {name: 'owner'},
-            {name: 'secret'},
-            {name: 'server'},
-            {name: 'farm'},
-            {name: 'title'},
-            {name: 'ispublic'},
-            {name: 'isfriend'},
-            {name: 'isfamily'},
-            {name: 'latitude', type: 'float'},
-            {name: 'longitude', type: 'float'},
-            {name: 'accuracy', type: 'int'},
-            {name: 'place_id'},
-            {name: 'woeid', type: 'int'},
-            {name: 'tags'}
-          ])
-        ),
-        panoramio: new Ext.data.JsonReader(
-          {
-            totalProperty: 'count',
-            root: 'photos',
-            id: 'photo_id'
-          }, 
-          Ext.data.Record.create([
-            {name: 'photo_id'},
-            {name: 'photo_title'},
-            {name: 'photo_url'},
-            {name: 'photo_file_url'},
-            {name: 'longitude', type:'float'},
-            {name: 'latitude', type:'float'},
-            {name: 'width', type:'int'},
-            {name: 'height', type:'int'},
-            {name: 'isfamily'},
-            {name: 'uploaded_date', type:'date'},
-            {name: 'owner_id', type: 'int'},
-            {name: 'owner_name'},
-            {name: 'owner_url'}
-          ])
-        )
-      };
-      
-      vtour.searchTpl = {
-        flickr: new Ext.XTemplate( 
-          '<tpl for=".">',
-          '<div class="thumb-wrap" id="{title}">',
-          '<div class="thumb" ext:position="{longitude},{latitude}" ',
-          'ext:tags="{tags}" ext:image="{imageurl}" ext:title="{title}" ',
-          'ext:imageid="{id}" ext:page_url="http://www.flickr.com/photos/{owner}/{id}">',
-          '<img src="{thumburl}" title="{title}"></div>',
-          '<span class="x-editable">{title}</span></div>',
-          '</tpl>',
-          '<div class="x-clear"></div>'
-        ),
-        panoramio: new Ext.XTemplate( 
-          '<tpl for=".">',
-          '<div class="thumb-wrap" id="{photo_title}">',
-          '<div class="thumb" ext:position="{longitude},{latitude}" ',
-          'ext:image="{imageurl}" ext:title="{photo_title}" ',
-          'ext:imageid="{photo_id}" ext:page_url="{photo_url}">',
-          '<img src="{thumburl}" title="{photo_title}"></div>',
-          '<span class="x-editable">{photo_title}</span></div>',
-          '</tpl>',
-          '<div class="x-clear"></div>'
-        )
-      };
     });
 
-    vtour.makeDateMenu = function( initDate, theStore, min ) {
-      var btn = new Ext.Toolbar.Button({ 
-        text: initDate.format('m/d/y'),
-        menu: new Ext.menu.DateMenu({
-          listeners:{ 
-            'beforeshow':function(menu){
-              menu.picker.setValue( initDate );
-            },
-            'select':function(picker,date){
-              btn.setText( date.format('m/d/y') );
-              if ( min ) {
-                theStore.baseParams.min_taken_date = date.format('Y-m-d');
-              }
-              else {
-                theStore.baseParams.max_taken_date = date.format('Y-m-d');
-              }
-            }
-          }
+    vtour.getPhotos = function( adapter, bbox, boxFeature, constraints ) {
+      var toDate = constraints.todate || new Date();
+      var fromDate = constraints.fromdate || (function(){ 
+        var d = new Date(); 
+        d.setFullYear( d.getFullYear() - 1 );
+        return d;
+      })();
+      var tags = constraints.tags || '';
+      var ppg = constraints.perpage || 10;
+
+      var store = adapter.getStore( bbox, fromDate, toDate, tags, ppg );
+
+      var oneSearchPanel = new Ext.Panel({
+        cls:'images-view',
+        width:535,
+        layout:'fit',
+        title:'Search '+(vtour.results.items.length),
+
+        items: new Ext.DataView({
+          store: store,
+          tpl: adapter.template,
+          autoHeight:true,
+          multiSelect: true,
+          overClass:'x-view-over',
+          itemSelector:'div.thumb-wrap',
+          emptyText: '',
+    
+          prepareData: adapter.prepareData
         }),
-        menuAlign:'br-tr'
-      });
 
-      return btn;
-    };
+        bbar: adapter.getToolbar( ppg, store, fromDate, toDate, tags ),
 
-    vtour.makeTextMenu = function( txt, theStore ) {
-      var txtBtn = new Ext.Toolbar.Button({
-        text: '\''+txt+'\'',
-        handler: function(btn){
-          var l = new Ext.Layer({});
-          var tags = btn.getText().match( /^'(.*)'$/ )[1];
-          
-          l.update('<div class="tagEdit"><input type="text" value="' + tags + '"/></div>');
-          l.show();
-          l.alignTo( btn.el, 'bl-tl' );
-
-          var html = Ext.DomQuery.select( 'div.tagEdit input' );
-          if (html != null && html.length == 1)
-            html[0].focus();
-
-          l.on( 'keypress', function(evt){
-            if ( evt.keyCode == 13 ) {
-              l.hide();
-
-              var theTxt = '';
-              if ( html != null && html.length == 1 )
-                 theTxt = html[0].value;
-                
-              btn.setText( '\'' + theTxt + '\'' );
-              theStore.baseParams.tags = theTxt;
-
-              l.remove();
-            };
-          });
-        }
-      });
-
-      return txtBtn;
-    };
-
-    vtour.getPhotos = {
-      flickr: function( bbox, boxFeature, constraints ) {
-        var toDate = constraints.todate || new Date();
-        var fromDate = constraints.fromdate || (function(){ 
-          var d = new Date(); 
-          d.setFullYear( d.getFullYear() - 1 );
-          return d;
-        })();
-        var tags = constraints.tags || '';
-        var ppg = constraints.perpage || 10;
-
-        var store = new Ext.data.Store({
-          proxy: vtour.pxy['flickr'],
-          reader: vtour.photoReader['flickr'],
-          baseParams: {
-            method: 'flickr.photos.search',
-            format: 'json',
-            api_key: vtour.flickrkey,
-            bbox: bbox,
-            min_taken_date: fromDate.format('Y-m-d'),
-            max_taken_date: toDate.format('Y-m-d'),
-            extras:'geo,tags',
-            tags: tags
-          }
-        });
-      
-        store.load({ params:
-          {
-            page: 1,
-            per_page: ppg
-          }
-        });
-      
-        var oneSearchPanel = new Ext.Panel({
-          cls:'images-view',
-          width:535,
-          layout:'fit',
-          title:'Search '+(vtour.results.items.length),
-
-          items: new Ext.DataView({
-            store: store,
-            tpl: vtour.searchTpl['flickr'],
-            autoHeight:true,
-            multiSelect: true,
-            overClass:'x-view-over',
-            itemSelector:'div.thumb-wrap',
-            emptyText: '',
-      
-            prepareData: function(data){
-              data.thumburl = 'http://farm' + data.farm + '.static.flickr.com/' + data.server + 
-                '/' + data.id + '_' + data.secret + '_s.jpg';
-              data.imageurl = 'http://farm' + data.farm + '.static.flickr.com/' + data.server + 
-                '/' + data.id + '_' + data.secret + '_m.jpg';
-              return data;
-            }
-          }),
-
-          bbar: new Ext.FlickrPagingToolbar({
-            pageSize: ppg,
-            store: store,
-            displayInfo: true,
-            displayMsg: 'Displaying images {0} - {1} of {2}',
-            emptyMsg: 'No images to display',
-            items:[
-              '-',
-              { xtype: 'tbtext', text: 'From:' },
-              vtour.makeDateMenu( fromDate, store, true ),
-              '-',
-              { xtype: 'tbtext', text: 'To:' },
-              vtour.makeDateMenu( toDate, store, false ),
-              '-',
-              { xtype: 'tbtext', text: 'Tags:' },
-              vtour.makeTextMenu( tags, store )
-            ],
-            listeners: {
-              'beforedestroy': function(cmp){ 
-                // destroy all the items in this toolbar, because something happens
-                // with the menus and buttons that keeps the panel from clearing
-                // if the items are not cleared when the toolbar is destroyed
-                cmp.items.clear();
+        listeners: {
+          // this activate function is eye candy
+          'activate': function(p) {
+            var layer = vtour.ol_layers['features'];
+            var index = vtour.results.items.findIndex( 'id', p.id );
+            var feature = (layer.features.slice( index-1, index ))[0];
+            var tween = new OpenLayers.Tween();
+            tween.start( 
+              { t: 255 }, 
+              { t: 0 }, 
+              20, 
+              {
+                callbacks: {
+                  eachStep: function( val ){ 
+                    if( feature ){
+                      feature.style.fillOpacity = 0.2 + (val['t'] / 255) * 0.8; 
+                      layer.redraw();
+                    }
+                    else {
+                      tween.stop();
+                    }
+                  }
+                }
               }
-            }
-          }),        
-          
-          listeners: {
-            // this activate function is eye candy
-            'activate': function(p) {
-              var layer = vtour.ol_layers['features'];
-              var index = vtour.results.items.findIndex( 'id', p.id );
-              var feature = (layer.features.slice( index-1, index ))[0];
-              var tween = new OpenLayers.Tween();
-              tween.start( 
-                { t: 255 }, 
-                { t: 0 }, 
-                20, 
-                {
-                  callbacks: {
-                    eachStep: function( val ){ 
-                      if( feature ){
-                        feature.style.fillOpacity = 0.2 + (val['t'] / 255) * 0.8; 
-                        layer.redraw();
-                      }
-                      else {
-                        tween.stop();
-                      }
-                    }
-                  }
-                }
-              ); // end tween.start
-            },
-            'render': function(rendered){
-              vtour.results.fireEvent('render',rendered);
-            }
+            ); // end tween.start
+          },
+          'render': function(rendered){
+            vtour.results.fireEvent('render',rendered);
           }
-        }); // end ext.panel
-      
-        boxFeature.attributes.searchElem = oneSearchPanel.id;
-        boxFeature.attributes.fromdate = fromDate;
-        boxFeature.attributes.todate = toDate;
-        boxFeature.attributes.tags = tags;
-        boxFeature.attributes.service = constraints.service;
-
-        // show results
-        vtour.results.add( oneSearchPanel ).show();
-
-        // up the tour stats, if avail
-        var srchNum = Ext.get('tourMgmtSearchNum');
-        if ( srchNum ) {
-          var num = vtour.results.items.getCount() - 1;
-
-          srchNum.update( num + ' search' + (num!=1?'es':'') );
         }
-      },
-      panoramio: function( bbox, boxFeature, constraints ) {
-        var ppg = constraints.perpage || 10;
-        var bounds = bbox.split( /,/ );
-        var store = new Ext.data.Store({
-          proxy: vtour.pxy['panoramio'],
-          reader: vtour.photoReader['panoramio'],
-          baseParams: {
-            order: 'upload_date',
-            set: 'full',
-            size: 'square',
-            minx: bounds[0],
-            miny: bounds[1],
-            maxx: bounds[2],
-            maxy: bounds[3]
-          }
-        });
+      }); // end ext.panel
+    
+      boxFeature.attributes.searchElem = oneSearchPanel.id;
+      boxFeature.attributes.fromdate = fromDate;
+      boxFeature.attributes.todate = toDate;
+      boxFeature.attributes.tags = tags;
+      boxFeature.attributes.service = constraints.service;
 
-        store.load({
-          params: {
-            from: 0,
-            to: ppg
-          }
-        });
-      
-        var oneSearchPanel = new Ext.Panel({
-          cls:'images-view',
-          width:535,
-          layout:'fit',
-          title:'Search '+(vtour.results.items.length),
+      // show results
+      vtour.results.add( oneSearchPanel ).show();
 
-          items: new Ext.DataView({
-            store: store,
-            tpl: vtour.searchTpl['panoramio'],
-            autoHeight:true,
-            multiSelect: true,
-            overClass:'x-view-over',
-            itemSelector:'div.thumb-wrap',
-            emptyText: '',
-        
-            prepareData: function(data){
-              data.thumburl = data.photo_file_url;
-              data.imageurl = data.photo_file_url.replace(/\/square\//, '/small/');
-              return data;
-            }
-          }),
+      // up the tour stats, if avail
+      var srchNum = Ext.get('tourMgmtSearchNum');
+      if ( srchNum ) {
+        var num = vtour.results.items.getCount() - 1;
 
-          bbar: new Ext.PanoramioPagingToolbar({
-            pageSize: ppg,
-            store: store,
-            displayInfo: true,
-            displayMsg: 'Displaying images {0} - {1} of {2}',
-            emptyMsg: 'No images to display'
-          }),
-
-          listeners: {
-            // this activate function is eye candy
-            'activate': function(p) {
-              var layer = vtour.ol_layers['features'];
-              var index = vtour.results.items.findIndex( 'id', p.id );
-              var feature = (layer.features.slice( index-1, index ))[0];
-              var tween = new OpenLayers.Tween();
-              tween.start( 
-                { t: 255 }, 
-                { t: 0 }, 
-                20, 
-                {
-                  callbacks: {
-                    eachStep: function( val ){ 
-                      if( feature ){
-                        feature.style.fillOpacity = 0.2 + (val['t'] / 255) * 0.8; 
-                        layer.redraw();
-                      }
-                      else {
-                        tween.stop();
-                      }
-                    }
-                  }
-                }
-              ); // end tween.start
-            },
-            'render': function(rendered){
-              vtour.results.fireEvent('render',rendered);
-            }
-          }
-        }); // end ext.panel
-      
-        boxFeature.attributes.searchElem = oneSearchPanel.id;
-        boxFeature.attributes.service = constraints.service;
-
-        // show results
-        vtour.results.add( oneSearchPanel ).show();
-
-        // up the tour stats, if avail
-        var srchNum = Ext.get('tourMgmtSearchNum');
-        if ( srchNum ) {
-          var num = vtour.results.items.getCount() - 1;
-
-          srchNum.update( num + ' search' + (num!=1?'es':'') );
-        }
+        srchNum.update( num + ' search' + (num!=1?'es':'') );
       }
     };
 
@@ -1451,9 +1166,6 @@
       padding:2px;
     }
     div#searchPanel {
-      padding:2px;
-    }
-    div#servicePanel {
       padding:2px;
     }
     div#searchControl {
@@ -1758,7 +1470,8 @@
         service: vtour.searchService
       };
       
-      vtour.getPhotos[vtour.searchService]( prjBounds.toBBOX(), polygonFeature, constraints );
+      var adapter = vtour.adapters[vtour.searchService];
+      vtour.getPhotos( adapter, prjBounds.toBBOX(), polygonFeature, constraints );
     };
 
     vtour.showDetail = function( feature ) {
@@ -1972,18 +1685,6 @@
       <li>
         <input type="radio" name="searchRadius" value="5" onclick="changeRadius(this);" id="sr3" /> 
         <label for="sr3">Large</label>
-      </li>
-    </ul>
-  </div>
-  <div id="servicePanel" class="x-hidden">
-    <ul>
-      <li>
-        <input type="radio" name="photoService" value="flickr" onclick="changeService(this);" id="fss" checked="checked"/>
-        <label for="fss">Flickr</label>
-      </li>
-      <li>
-        <input type="radio" name="photoService" value="panoramio" onclick="changeService(this);" id="pss"/>
-        <label for="pss">Panoramio</label>
       </li>
     </ul>
   </div>
