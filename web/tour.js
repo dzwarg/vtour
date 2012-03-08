@@ -24,13 +24,14 @@ Tour.prototype.addPoint = function( lat, lon )
 //
 Tour.prototype.removePoint = function( index )
 {
-  if ( index >= 0 && index < this.TourPoints.length - 1 )
+  if ( index >= 0 && index < this.TourPoints.length )
   {
-    var pt = this.TourPoints.slice( index, 1 );
+    var pt = this.TourPoints.slice( index, index+1 )[0];
+
     this.TourPoints.splice( index, 1 );
     var cont = pt.PhotoPanel.parentNode;
     cont.removeChild( pt.PhotoPanel );
-    this.UpdatePhotoPaging( cont );
+    pt.UpdatePhotoPaging( cont );
     this.TourPolyline = null;
   }
 };

@@ -421,3 +421,14 @@ function findPlace()
   });
   map.geoCodeAddress(place.value);
 }
+
+//
+//
+// Close the initial help window.
+//
+//
+function closeHelp( event )
+{
+  var helpDiv = document.getElementById('help');
+  helpDiv.style.display = 'none';
+}

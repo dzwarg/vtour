@@ -10,7 +10,7 @@
 <body onload="setup();" class="gradient">
 
 <div class="banner">
-  <h1>Oh, The Places You Will Go</h1>
+  <h1 class="pagetitle">Oh, The Places You Will Go</h1>
 </div>
 
 <div class="actionpanel">
@@ -26,13 +26,32 @@
 <div id="mapExt">
   <div id="map"></div>
   <div id="help">
-      <h1>Welcome</h1>
-      <p>You can use this site to find photographs from photo-sharing
-      services that geocode photographs, like Flickr (and soon Panoramio).</p>
-
-      <p>To begin, just start clicking on the map to find photographs near
-      that place.</p>
+    <div id="close">
+      <a href="#" onclick="closeHelp();">
+        <img src="close.gif" alt="[ X ]" border="0"/>
+      </a>
     </div>
+
+    <h1>Welcome</h1>
+
+    <p>Use this map to find photographs that have been geotagged on 
+    <a href="http://www.flickr.com/">flickr</a> <a href="#panoramio">*</a>.
+    </p>
+
+    <p>To start, search for the place you are interested in. The search box
+    is in the upper right hand corner.  Go ahead and find your place now.
+    I'll wait.</p>
+
+    <p>Now that you've found a place to investigate, start clicking on the
+    map.  Each click will place a marker, and search flickr for photographs
+    near the place you clicked.  When the photos are found, they will appear
+    in the light strip below the map.</p>
+
+    <hr/>
+
+    <p><a name="panoramio">* Support for 
+    <a href="http://www.panoramio.com/">panoramio</a> is coming soon.</p>
+  </div>
 </div>
 
 <div id="lightslide">
@@ -45,14 +64,14 @@
   <div id="nextPhotos">
     <div class="slideButton" onclick="nextPoint();">&rarr;</div>
   </div>
-
-  <div id="waiting">
-    <img src="progress.gif"/>
-  </div>
 </div>
 
 <div id="pager">
   <span id="pagerNow">0</span> / <span id="pagerTotal">0</span>
+</div>
+
+<div id="waiting">
+  Fetching images: <img src="progress.gif"/>
 </div>
 
 <div id="debug">
