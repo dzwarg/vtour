@@ -5,9 +5,6 @@
   <!-- ExtJS scripts -->
   <link rel="stylesheet" type="text/css" href="ext-2.0.2/resources/css/ext-all.css" />
   <link rel="stylesheet" type="text/css" href="ext-2.0.2/resources/css/xtheme-gray.css" />
-  <style type="text/css">
-    body { font-family: 'Tahoma','Arial','Helvetica','sans-serif'; }
-  </style>
   <script type="text/javascript" src="ext-2.0.2/adapter/ext/ext-base.js"></script>
   <script type="text/javascript" src="ext-2.0.2/ext-all.js"></script>
   <script type="text/javascript" src="FlickrPagingToolbar.js"></script>
@@ -638,61 +635,89 @@
         width: 100,
         text: 'Save'
       });
-      
+
       var tourMgmtPanel = new Ext.form.FormPanel({
 	// provide tour management
 	border: false,
-	bodyStyle: 'padding:2px;',
+        layout: 'column',
+        defaults: {
+          border: false
+        },
 	items:[
           new Ext.Panel({
-            title: 'Save',
-            collapsible: true,
-            layout: 'column',
-            width: 700,
+            columnWidth: 0.5,
+            bodyStyle: 'padding:10px',
             items:[
-              {
-                style: 'padding: 2px 0px 0px 2px;',
-                width: 400,
+              new Ext.form.TextField({
+                maxLength: 1024,
+                name: 'tourName',
+                selectOnFocus: true,
+                style: 'font-size:2em;height:1.3em;margin-bottom:10px;',
+                value: 'Untitled 1'
+              }),
+              new Ext.Panel({
                 border: false,
-                html: 'To save this tour, enter a name and click "Save".'
-              },
-              tourNameField,
-              tourSaveBtn
-            ]
-          }),
-          new Ext.Panel({
-            title: 'Delete',
-            collapsible: true,
-            layout: 'column',
-            width: 700,
-            items:[
-              {
-                style: 'padding: 2px 0px 0px 2px;',
-                width: 400,
-                border: false,
-                html: 'To delete this tour, click "Delete".'
-              },
-              {
-                border: false,
-                width: 200,
-                html: '&nbsp;'
-              },
-              new Ext.Button({
-                text: 'Delete',
-                style: 'padding-left:2px;',
-                width: 100,
-                handler: function( btn ){
-                  while (vtour.results.getComponent(1) != null) {
-                    vtour.results.remove( vtour.results.getComponent(1) );
+                layout: 'column',
+                defaults: { 
+                  border: false,
+                  ctCls: 'opContainer',
+                  cls: 'opPanel'
+                },
+                items: [
+                  {
+                    contentEl: 'saveBtnPanel'
+                  },{
+                    contentEl: 'copyBtnPanel'
+                  },{
+                    contentEl: 'delBtnPanel'
+                  }
+                ],
+                listeners: {
+                  'afterlayout':function(cont,lyt){
+                    var btnAs = Ext.DomQuery.select( 'div.opPanel', cont.el.dom );
+                    for( var i = 0; i < btnAs.length; i++ ) {
+                      var el = Ext.get(btnAs[i]);
+                      el.on( 'mouseover', function(e){ 
+                        var el2 = Ext.get(e.getTarget( 'div.opPanel' ));
+                        var cmp = Ext.getCmp(el2.id);
+                        cmp.body.addClass('opOver');
+                      });
+                      el.on( 'mouseout', function(e){
+                        var el2 = Ext.get(e.getTarget( 'div.opPanel' ));
+                        var cmp = Ext.getCmp(el2.id);
+                        cmp.body.removeClass('opOver');
+                      });
+                    }
                   }
                 }
               })
+            ]
+          }),
+          new Ext.Panel({
+            columnWidth: 0.5,
+            bodyStyle: 'padding:10px;',
+            defaults: {
+              border: false,
+              style: 'font-size:1.5em;height:1.1em;margin-bottom:10px;'
+            },
+            items:[
+              { 
+                id: 'tourMgmtSearchNum',
+                html: '0 searches'
+              },{
+                id: 'tourMgmtResultNum',
+                html: '0 results' 
+              },{
+                id: 'tourMgmtCreateTime',
+                html: 'not saved yet' 
+              }
             ]
           })
 	]
       });
 
       tourSaveBtn.on('click', saveTourHandler( tourMgmtPanel.getForm() ) );
+
 
       vtour.results = new Ext.TabPanel({
         id:'resultTabs',
@@ -726,6 +751,23 @@
 		vtour.ol_layers['markers'].removeFeatures( [feature] );
 	      }
 	    }
+
+            // update the tour stats, if avail
+            var resNum = Ext.get('tourMgmtResultNum');
+            if ( resNum ) {
+              var num = vtour.ol_layers['markers'].features.length;
+
+              resNum.update( num + ' result' + (num!=1?'s':'') );
+            }
+
+            // update the tour stats, if avail
+            var srchNum = Ext.get('tourMgmtSearchNum');
+            if ( srchNum ) {
+              // -1 for the mgmt panel, -1 for the search about to be removed
+              var num = me.items.getCount() - 2;
+
+              srchNum.update( num + ' search' + (num!=1?'es':'') );
+            }
 
 	    firstPanelSwitch( me.items.get(0), me.items.getCount()>2 );
           },
@@ -1039,7 +1081,15 @@
       boxFeature.attributes.tags = tags;
 
       // show results
-      vtour.results.add( oneSearchPanel ).show();      
+      vtour.results.add( oneSearchPanel ).show();
+
+      // up the tour stats, if avail
+      var srchNum = Ext.get('tourMgmtSearchNum');
+      if ( srchNum ) {
+        var num = vtour.results.items.getCount() - 1;
+
+        srchNum.update( num + ' search' + (num!=1?'es':'') );
+      }
     }
 
     vtour.setMapHeight = function(){
@@ -1050,7 +1100,7 @@
 	</script>
   <style type="text/css">
     html,body,div {
-      font-family: "Arial,Helvetica,sans-serif"
+      font-family: 'Tahoma','Arial','Helvetica',sans-serif;
     }
     div#mapLayerSwitcherPanel {
       padding:2px;
@@ -1063,6 +1113,27 @@
       text-align: center;
       font-size: 2em;
       color: #999999;
+    }
+
+    /** operation buttons (save/copy/delete) **/
+    .opContainer {
+      text-align:center;
+      font-size:0.75em;
+    }
+    .opPanel {
+      height: 75px;
+      width: 75px;
+      margin-left:5px;
+      margin-right:5px;
+    }
+    .opPanel img {
+      width: 50px;
+    }
+    .opPanel a {
+      text-decoration:none;
+    }
+    .opOver {
+      background-color:#ff0000;
     }
     
     /** paging toolbar and dataview **/
@@ -1230,6 +1301,14 @@
 
                 if (remove) { 
                   vtour.ol_layers['markers'].removeFeatures( [feature] );
+                  
+                  // update the tour stats, if avail
+                  var resNum = Ext.get('tourMgmtResultNum');
+                  if ( resNum ) {
+                    var num = vtour.ol_layers['markers'].features.length;
+
+                    resNum.update( num + ' result' + (num!=1?'s':'') );
+                  }
                 }
               }
             );
@@ -1348,6 +1427,14 @@
 
       // attach to the feature layer
       vtour.ol_layers['markers'].addFeatures( [feature] );
+
+      // update the tour stats, if avail
+      var resNum = Ext.get('tourMgmtResultNum');
+      if ( resNum ) {
+        var num = vtour.ol_layers['markers'].features.length;
+
+        resNum.update( num + ' result' + (num!=1?'s':'') );
+      }
     }
 
     vtour.saveTour = function( id, name, date, success, failure ) {
@@ -1484,7 +1571,9 @@
       </li>
     </ul>
   </div>
-  <div id="datePanel" class="x-hidden">hi!</div>
+  <div id="saveBtnPanel"><a href="#"><img src="gtk-save.png"/></a><br/><a href="#">Save</a></div>
+  <div id="copyBtnPanel"><a href="#"><img src="gtk-copy.png"/></a><br/><a href="#">Copy</a></div>
+  <div id="delBtnPanel"><a href="#"><img src="gtk-clear.png"/></a><br/><a href="#">Delete</a></div>
   <div id="south">
     <p>Click on the map to search for photos.</p>
   </div>
